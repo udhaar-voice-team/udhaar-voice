@@ -23,7 +23,7 @@ export function MaskedPhone({ phone, className }: { phone: string; className?: s
   const t = useT();
   if (!phone) return <span className={cn("text-muted-foreground italic", className)}>No number</span>;
   return (
-    <span className={cn("tabular font-mono text-muted-foreground", className)} title={`${t.common.prototype.short}: numbers are masked`}>
+    <span className={cn("tabular font-mono text-muted-foreground", className)} title={t.common.prototype.masked}>
       {maskPhone(phone)}
     </span>
   );

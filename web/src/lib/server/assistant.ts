@@ -1,13 +1,12 @@
 import { addDays, format } from "date-fns";
 import { formatINR, isPromiseBroken, toDateKey } from "@/lib/domain/rules";
-import type { AskAnswer } from "../contract";
-import { scheduleInDb } from "./engine";
+import type { AskAnswer, ScheduleInput, ScheduleResult } from "@/lib/api/contract";
+import type { ShopData } from "./data";
 import { candidates, customerSummary, findCustomerByName, fmtDay, summaries } from "./queries";
-import type { MockDb } from "./types";
 
 /**
- * MOCK ONLY. "Ask your khata" without an LLM: keyword intents mapped to the same tools
- * the real Bolna assistant will call as custom functions (get_summary, list_promises, ...).
+ * "Ask your khata" without an LLM, until Gemini answers instead: keyword intents mapped to the
+ * tools the model will call (get_summary, list_promises, ...).
  */
 
 const has = (q: string, words: string[]) => words.some((w) => q.includes(w));
@@ -25,7 +24,12 @@ const WORDS = {
   total: ["total", "overall", "sab", "সব", "कुल"],
 };
 
-export function answerQuestion(db: MockDb, question: string, now: Date): AskAnswer {
+export async function answerQuestion(
+  db: ShopData,
+  question: string,
+  now: Date,
+  schedule: (input: ScheduleInput) => Promise<ScheduleResult>,
+): Promise<AskAnswer> {
   const q = ` ${question.toLowerCase().trim()} `;
   const named = findCustomerByName(db, q);
 
@@ -41,7 +45,7 @@ export function answerQuestion(db: MockDb, question: string, now: Date): AskAnsw
         answer: `I can't call ${named.name} right now: ${eligible?.reason ?? "not eligible"}.`,
       };
     }
-    const result = scheduleInDb(db, { customerIds: [named.id], at: has(q, WORDS.tomorrow) ? when.toISOString() : "now", language: "auto", bypassHours: db.shop.demoBypassHours }, now);
+    const result = await schedule({ customerIds: [named.id], at: has(q, WORDS.tomorrow) ? when.toISOString() : "now", language: "auto", bypassHours: db.shop.demoBypassHours });
     if (result.outsideHours) {
       const hour = (h: number) => format(new Date(2026, 0, 1, h), "h a");
       return {

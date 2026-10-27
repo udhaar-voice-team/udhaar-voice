@@ -2,10 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { subscribeToDataChanges } from "@/lib/api";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -16,9 +15,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }),
   );
-
-  // Any write to the data layer (a mutation, the call simulator, another tab) refreshes every screen.
-  useEffect(() => subscribeToDataChanges(() => queryClient.invalidateQueries()), [queryClient]);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>

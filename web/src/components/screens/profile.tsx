@@ -36,11 +36,9 @@ function ProfileForm({ session: { user, shop } }: { session: Session }) {
   const save = useApiMutation(api.updateProfile);
   const [draft, setDraft] = useState<ProfileInput>({
     name: user.name,
-    nameNative: shop.ownerNameNative ?? "",
     phone: localPhone(user.phone),
     email: user.email ?? "",
     shopName: shop.name,
-    area: shop.area,
     upiId: shop.upiId,
   });
   const set = (key: keyof ProfileInput, value: string) => setDraft((d) => ({ ...d, [key]: value }));
@@ -77,7 +75,6 @@ function ProfileForm({ session: { user, shop } }: { session: Session }) {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           {field("name", t.you.name, undefined, { autoComplete: "name", required: true })}
-          {field("nameNative", t.you.nameNative, t.you.nameNativeHint, { lang: "bn" })}
           {field("phone", t.you.phone, t.you.phoneHint, { inputMode: "tel", autoComplete: "tel-national", required: true })}
           {field("email", t.you.email, t.you.emailHint, { type: "email", autoComplete: "email", required: true })}
         </CardContent>
@@ -89,7 +86,6 @@ function ProfileForm({ session: { user, shop } }: { session: Session }) {
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           {field("shopName", t.shop.name, undefined, { autoComplete: "organization", required: true })}
-          {field("area", t.shop.area)}
         </CardContent>
       </Card>
 
@@ -98,7 +94,7 @@ function ProfileForm({ session: { user, shop } }: { session: Session }) {
           <CardTitle>{t.payments.title}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          {field("upiId", t.payments.upi, t.payments.upiHint, { autoCapitalize: "none", spellCheck: false, required: true })}
+          {field("upiId", t.payments.upi, t.payments.upiHint, { autoCapitalize: "none", spellCheck: false })}
           <div className="space-y-1.5">
             <p className="text-sm font-medium">{t.payments.preview}</p>
             <p className="rounded-lg border bg-muted/40 px-3 py-2 text-xs leading-relaxed break-all text-muted-foreground">{example}</p>

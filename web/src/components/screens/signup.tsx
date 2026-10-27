@@ -75,6 +75,7 @@ export function SignupScreen() {
                 id="signup-email"
                 type="email"
                 autoComplete="email"
+                required
                 placeholder={t.signup.emailPlaceholder}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

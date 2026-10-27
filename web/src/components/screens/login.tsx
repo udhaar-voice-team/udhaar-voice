@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import type { SignInInput } from "@/lib/api/contract";
 import { useApiMutation } from "@/lib/api/hooks";
-import { DEMO_EMAIL, DEMO_PASSWORD, DEMO_PHONE } from "@/lib/api/mock/seed";
+import { DEMO_EMAIL, DEMO_PASSWORD, DEMO_PHONE } from "@/lib/demo/account";
 import { useT } from "@/lib/i18n";
 
 export function LoginScreen() {

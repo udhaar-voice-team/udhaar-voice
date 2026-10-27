@@ -4,9 +4,12 @@ Bolna Buildathon project. Read `README.md` first. The app lives in `web/` (Next.
 
 ## Architecture rules
 
-- **Screens depend only on `src/lib/api/contract.ts`** (through `src/lib/api/hooks.ts`). Never import from `lib/api/mock/` in a screen. Exceptions, all prototype-only and marked: the sample khata page and the simulation-speed control in Settings.
+- **Screens depend only on `src/lib/api/contract.ts`** (through `src/lib/api/hooks.ts`). The browser reaches it through `lib/api/http.ts`; the server implements it in `lib/server/api.ts`. Never import `lib/server/` from a screen. Exception: the sample khata page reads `lib/demo/khata-sample.ts`.
 - **Business rules are pure functions in `src/lib/domain/rules.ts`**: no clock reads (pass `now`), no I/O. Add a test in `rules.test.ts` for every new rule.
-- **Mock code stays in `src/lib/api/mock/`.** It will be deleted when Bolna and Supabase are connected; keep it isolated.
+- **Server queries are pure functions over `ShopData`** (`lib/server/queries.ts`, `scheduling.ts`); `lib/server/data.ts` loads a shop's rows and `api.ts` does the writes. Test the pure parts with `createSeed()`.
+- **Database changes go in a new file in `web/supabase/migrations/`**, never by editing an applied one. Every shop-owned table has `shop_id` and the `own_shop` policy. Writes touching several rows go in a SQL function (security invoker).
+- **Secrets stay server-side.** The service role key is only used in `lib/server/supabase.ts` (`adminClient`) and `scripts/`; nothing under `NEXT_PUBLIC_`.
+- **The server runs in India time** (`lib/server/timezone.ts`, imported first by the API route), because the rules read local hours and dates.
 - **All shopkeeper-facing text goes in `src/lib/i18n/en/*.ts`**, with the same keys in `src/lib/i18n/bn.ts` (Bengali) and `src/lib/i18n/hi.ts` (Hindi), and is read with `useT()`. The typechecker fails if a translation is missing. The landing page and `/try` are English-only and may inline text.
 - One modular monolith. No microservices.
 

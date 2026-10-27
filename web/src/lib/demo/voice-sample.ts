@@ -1,8 +1,8 @@
-import type { Transcription } from "../contract";
+import type { Transcription } from "@/lib/api/contract";
 
 /**
- * MOCK ONLY. What the dummy speech-to-text "hears". The clip is recorded but not sent anywhere;
- * each recording returns the next of these. The real version sends the audio to Gemini or Sarvam.
+ * What speech-to-text "hears" until a model is connected: the clip is uploaded but not read,
+ * and each recording returns one of these.
  */
 export const SAMPLE_TRANSCRIPTIONS: Transcription[] = [
   { text: "Kaun is hafte dega?", language: "hi" },

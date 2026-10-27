@@ -2,8 +2,9 @@ import { toDateKey } from "@/lib/domain/rules";
 import type { Extraction, Language, Turn } from "@/lib/domain/types";
 
 /**
- * MOCK ONLY. Scripted reminder conversations used by the call simulator.
- * The real system gets transcripts and extractions from Bolna's webhook instead.
+ * Scripted reminder conversations: the demo shop's call history, and the /try page's demo call
+ * until it dials for real. Real calls get transcripts and extractions from Bolna's webhook.
+ * Also the evening summary's script.
  */
 
 export type Persona =

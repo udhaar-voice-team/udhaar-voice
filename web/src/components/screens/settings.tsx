@@ -1,20 +1,18 @@
 "use client";
 
-import { CheckCircle2, FlaskConical, RotateCcw } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { CheckCircle2, FlaskConical } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { ErrorBlock, LoadingBlock, PageHeader } from "@/components/app/bits";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { api, subscribeToDataChanges } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useApiMutation, useShop } from "@/lib/api/hooks";
-import { getSimulationSpeed, setSimulationSpeed, SPEEDS } from "@/lib/api/mock/controls";
 import { Shop as ShopSchema, type Language, type Shop } from "@/lib/domain/types";
 import { setAppLanguage, useAppLanguage, useT } from "@/lib/i18n";
 
@@ -93,20 +91,11 @@ function WorkflowForm({ shop }: { shop: Shop }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>{s.languages.title}</CardTitle>
-          <CardDescription>{s.languages.hint}</CardDescription>
+          <CardTitle>{s.newCustomers.title}</CardTitle>
+          <CardDescription>{s.newCustomers.hint}</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-5">
-          {LANGS.map((lang) => (
-            <label key={lang} className="flex items-center gap-2 text-sm">
-              <Checkbox
-                id={`lang-${lang}`}
-                checked={draft.languages.includes(lang)}
-                onCheckedChange={(on) => set("languages", on ? [...draft.languages, lang] : draft.languages.filter((l) => l !== lang))}
-              />
-              {t.common.language[lang]}
-            </label>
-          ))}
+        <CardContent>
+          <LanguageSelect id="default-customer-language" label={s.newCustomers.title} value={draft.defaultCustomerLanguage} onChange={(l) => set("defaultCustomerLanguage", l)} />
         </CardContent>
       </Card>
 
@@ -128,19 +117,7 @@ function WorkflowForm({ shop }: { shop: Shop }) {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="report-language">{s.summary.language}</Label>
-                <Select value={draft.reportLanguage} onValueChange={(v) => set("reportLanguage", v as Language)}>
-                  <SelectTrigger id="report-language" className="h-11 w-full sm:h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGS.map((l) => (
-                      <SelectItem key={l} value={l} lang={l}>
-                        {LANGUAGE_NAMES[l]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">{s.summary.languageHint}</p>
+                <LanguageSelect id="report-language" value={draft.reportLanguage} onChange={(l) => set("reportLanguage", l)} />
               </div>
             </div>
           ) : null}
@@ -178,6 +155,23 @@ function AppLanguage() {
   );
 }
 
+function LanguageSelect({ id, label, value, onChange }: { id: string; label?: string; value: Language; onChange: (l: Language) => void }) {
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as Language)}>
+      <SelectTrigger id={id} className="h-11 w-full sm:h-10 sm:w-56" aria-label={label}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {LANGS.map((l) => (
+          <SelectItem key={l} value={l} lang={l}>
+            {LANGUAGE_NAMES[l]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function HourSelect({ id, label, value, onChange, hours }: { id: string; label: string; value: number; onChange: (h: number) => void; hours: number[] }) {
   return (
     <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
@@ -196,13 +190,8 @@ function HourSelect({ id, label, value, onChange, hours }: { id: string; label: 
 }
 
 function PrototypeControls({ shop }: { shop: Shop }) {
-  const dict = useT();
-  const t = dict.settings.prototype;
+  const t = useT().settings.prototype;
   const update = useApiMutation(api.updateShop);
-  const reset = useApiMutation(api.resetDemo);
-  const [confirming, setConfirming] = useState(false);
-  // The speed lives in this browser's demo data; re-read it whenever that data changes.
-  const speed = useSyncExternalStore(subscribeToDataChanges, getSimulationSpeed, () => null);
 
   return (
     <Card className="border-promised/40">
@@ -212,26 +201,7 @@ function PrototypeControls({ shop }: { shop: Shop }) {
         </CardTitle>
         <CardDescription>{t.description}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <Label>{t.speed}</Label>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            value={speed ? String(speed) : undefined}
-            onValueChange={(v) => {
-              if (v) setSimulationSpeed(Number(v));
-            }}
-          >
-            {SPEEDS.map((s) => (
-              <ToggleGroupItem key={s} value={String(s)}>
-                {s}×
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          <p className="text-xs text-muted-foreground">{t.speedHint}</p>
-        </div>
-
+      <CardContent>
         <label className="flex items-start gap-3">
           <Switch id="demo-bypass" checked={shop.demoBypassHours} onCheckedChange={(on) => update.mutate({ demoBypassHours: on })} />
           <span>
@@ -239,34 +209,6 @@ function PrototypeControls({ shop }: { shop: Shop }) {
             <span className="block text-xs text-muted-foreground">{t.bypassHint}</span>
           </span>
         </label>
-
-        <div className="space-y-3 border-t pt-5">
-          {!confirming ? (
-            <Button variant="outline" onClick={() => setConfirming(true)}>
-              <RotateCcw /> {t.reset}
-            </Button>
-          ) : (
-            <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-              <p className="text-sm">{t.resetConfirm}</p>
-              <div className="flex gap-2">
-                <Button
-                  variant="destructive"
-                  disabled={reset.isPending}
-                  onClick={async () => {
-                    await reset.mutateAsync(undefined);
-                    setConfirming(false);
-                    toast.success(t.resetDone);
-                  }}
-                >
-                  {t.resetYes}
-                </Button>
-                <Button variant="ghost" onClick={() => setConfirming(false)}>
-                  {dict.common.actions.cancel}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
       </CardContent>
     </Card>
   );

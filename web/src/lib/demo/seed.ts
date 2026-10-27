@@ -1,24 +1,20 @@
 import { toDateKey } from "@/lib/domain/rules";
 import type { Call, CallEvent, Customer, Language, LedgerEntry, Payment, PaymentPromise, ReminderBatch } from "@/lib/domain/types";
+import type { ShopData } from "@/lib/server/data";
+import { DEMO_PHONE_E164 } from "./account";
 import { addDays, buildReminderScript, transcriptSeconds, type Persona } from "./scripts";
-import type { MockDb } from "./types";
 
 /**
- * MOCK ONLY. A fictional shop and its customers. Every date is relative to "now",
- * so the demo always looks current. Phone numbers are fake and always shown masked.
+ * The demo shop and its history, loaded into Supabase by `npm run db:seed`. Every date is relative
+ * to "now", so the demo always looks current. Phone numbers are fake and always shown masked.
+ * IDs here are labels; the seed script gives each row a real UUID.
  */
 
-export const DB_VERSION = 5;
 export const SHOP_ID = "s1";
 export const DEMO_USER_ID = "u-demo";
-/** 10-digit form the shopkeeper types. Stored on the user as "+919000000001". */
-export const DEMO_PHONE = "9000000001";
-export const DEMO_PHONE_E164 = "+919000000001";
-export const DEMO_EMAIL = "demo@udhaar.voice";
-export const DEMO_PASSWORD = "demo1234";
 export const COST_PER_MINUTE_USD = 0.06;
-/** Calls that can be on the line at once, across every shop. Bolna trial accounts allow 2, paid accounts start at 10. */
-export const CALL_LINES = 2;
+
+export type DemoShop = Omit<ShopData, "lines" | "imports">;
 
 type SeedCustomer = {
   id: string;
@@ -99,7 +95,7 @@ function at(now: Date, daysAgo: number, hour = 10, minute = 0): Date {
 
 const plus = (d: Date, seconds: number) => new Date(d.getTime() + seconds * 1000).toISOString();
 
-export function createSeed(now: Date = new Date()): MockDb {
+export function createSeed(now: Date = new Date()): DemoShop {
   const created = at(now, 60).toISOString();
   const customers: Customer[] = CUSTOMERS.map((c, i) => ({
     id: c.id,
@@ -136,31 +132,15 @@ export function createSeed(now: Date = new Date()): MockDb {
     })),
   );
 
-  const db: MockDb = {
-    version: DB_VERSION,
-    seededAt: now.toISOString(),
-    users: [
-      {
-        id: DEMO_USER_ID,
-        shopId: SHOP_ID,
-        phone: DEMO_PHONE_E164,
-        email: DEMO_EMAIL,
-        password: DEMO_PASSWORD,
-        name: "Gopal Saha",
-        createdAt: now.toISOString(),
-      },
-    ],
-    sessionUserId: null,
+  const db: DemoShop = {
     shop: {
       id: SHOP_ID,
       ownerUserId: DEMO_USER_ID,
       name: "Maa Tara Variety Stores",
       ownerName: "Gopal Saha",
-      ownerNameNative: "গোপাল সাহা",
-      ownerPhone: "+919000000001",
-      area: "B-Block Market, Kalyani",
+      ownerPhone: DEMO_PHONE_E164,
       upiId: "maatara.demo@upi",
-      languages: ["bn", "hi"],
+      defaultCustomerLanguage: "bn",
       callingHours: { start: 8, end: 19 },
       reminderGapDays: 3,
       maxCallMinutes: 3,
@@ -177,10 +157,6 @@ export function createSeed(now: Date = new Date()): MockDb {
     notes: [],
     calls: [],
     batches: [],
-    imports: [],
-    personas: Object.fromEntries(CUSTOMERS.map((c) => [c.id, c.persona])),
-    plans: {},
-    demo: { speed: 2, tryCalls: {} },
   };
 
   for (const sc of PAST_CALLS) addPastCall(db, sc, now);
@@ -204,11 +180,13 @@ export function createSeed(now: Date = new Date()): MockDb {
   return db;
 }
 
-function addPastCall(db: MockDb, sc: SeedCall, now: Date) {
+const PERSONAS: Record<string, Persona> = Object.fromEntries(CUSTOMERS.map((c) => [c.id, c.persona]));
+
+function addPastCall(db: DemoShop, sc: SeedCall, now: Date) {
   const customer = db.customers.find((c) => c.id === sc.customerId);
   if (!customer) return;
   const start = at(now, sc.daysAgo, sc.at[0], sc.at[1]);
-  const persona = db.personas[customer.id];
+  const persona = PERSONAS[customer.id];
   const missed = db.promises
     .filter((p) => p.customerId === customer.id && p.status === "broken")
     .map((p) => ({ amount: p.amount, dueDate: p.dueDate }));

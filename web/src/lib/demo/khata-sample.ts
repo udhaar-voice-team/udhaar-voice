@@ -1,6 +1,6 @@
 /**
- * MOCK ONLY. A sample khata page and what a vision model would read from it.
- * The real system sends the photo to a vision model (Gemini) and gets the same shape back.
+ * A sample khata page and what a vision model reads from it. Used for the "try the sample page"
+ * option, and for every photo until the vision model is connected.
  */
 
 export type SampleLine = {

@@ -28,12 +28,11 @@ import type {
   GraphEdge,
   GraphNode,
   QueueSpot,
-} from "../contract";
-import { buildReportScript } from "./scripts";
-import { CALL_LINES } from "./seed";
-import type { MockDb } from "./types";
+} from "@/lib/api/contract";
+import { buildReportScript } from "@/lib/demo/scripts";
+import type { ShopData } from "./data";
 
-/** MOCK ONLY. Read-only views over the demo database. The real backend will run these as SQL. */
+/** What each screen shows, worked out from one shop's rows. Pure: no I/O, no clock reads. */
 
 export const fmtDay = (isoDate: string) => format(parseISO(isoDate), "EEE d MMM");
 
@@ -42,11 +41,11 @@ export const isActiveCall = (s: CallStatus) => ACTIVE.includes(s);
 
 const byNewest = (a: Call, b: Call) => (b.startedAt ?? b.scheduledAt).localeCompare(a.startedAt ?? a.scheduledAt);
 
-function customerCalls(db: MockDb, customerId: string): Call[] {
+function customerCalls(db: ShopData, customerId: string): Call[] {
   return db.calls.filter((k) => k.customerId === customerId && k.kind === "reminder").sort(byNewest);
 }
 
-export function customerSummary(db: MockDb, c: Customer, now: Date): CustomerSummary {
+export function customerSummary(db: ShopData, c: Customer, now: Date): CustomerSummary {
   const entries = db.entries.filter((e) => e.customerId === c.id);
   const payments = db.payments.filter((p) => p.customerId === c.id);
   const promises = db.promises.filter((p) => p.customerId === c.id);
@@ -69,14 +68,14 @@ export function customerSummary(db: MockDb, c: Customer, now: Date): CustomerSum
   };
 }
 
-export function summaries(db: MockDb, now: Date): CustomerSummary[] {
+export function summaries(db: ShopData, now: Date): CustomerSummary[] {
   const order: Record<CustomerSummary["status"], number> = { overdue: 0, disputed: 1, due: 2, promised: 3, opted_out: 4, paid: 5 };
   return db.customers
     .map((c) => customerSummary(db, c, now))
     .sort((a, b) => order[a.status] - order[b.status] || b.balance - a.balance);
 }
 
-export function customerDetail(db: MockDb, id: string, now: Date): CustomerDetail | null {
+export function customerDetail(db: ShopData, id: string, now: Date): CustomerDetail | null {
   const c = db.customers.find((x) => x.id === id);
   if (!c) return null;
   const summary = customerSummary(db, c, now);
@@ -101,7 +100,7 @@ export function customerDetail(db: MockDb, id: string, now: Date): CustomerDetai
 export const REFUSAL_COOLDOWN_DAYS = 14;
 
 /** Who can be called now, and why not for the rest. */
-export function candidates(db: MockDb, now: Date): EligibleCustomer[] {
+export function candidates(db: ShopData, now: Date): EligibleCustomer[] {
   return summaries(db, now).map((s) => {
     const c = s.customer;
     const active = db.calls.some((k) => k.customerId === c.id && isActiveCall(k.status));
@@ -135,31 +134,29 @@ export function candidates(db: MockDb, now: Date): EligibleCustomer[] {
 /** A typical reminder call, for wait estimates. */
 const AVG_CALL_SECONDS = 90;
 
-/** Place in line for every call waiting for a free line, in the order the engine will dial them. */
-function queueSpots(db: MockDb): Map<string, QueueSpot> {
-  const onLine = db.calls.filter((k) => k.status === "ringing" || k.status === "in_progress");
-  const order = dialOrder(db.calls.filter((k) => k.status === "queued"), onLine);
-  const freeLines = Math.max(0, CALL_LINES - onLine.length);
-  // Simulated calls play faster than real ones; scale the estimate to match.
-  const avgCallSeconds = AVG_CALL_SECONDS / Math.max(0.5, db.demo.speed);
+/** Place in line for every call waiting for a free line, in the order the dispatcher will dial them. */
+function queueSpots(db: ShopData): Map<string, QueueSpot> {
+  const { lines, onLine, waiting } = db.lines;
+  const order = dialOrder(waiting, onLine);
+  const freeLines = Math.max(0, lines - onLine.length);
   return new Map(
     order.map((call, i) => [
       call.id,
-      { position: i + 1, lines: CALL_LINES, busyLines: onLine.length, waitSeconds: estimatedWaitSeconds(i, { lines: CALL_LINES, freeLines, avgCallSeconds }) },
+      { position: i + 1, lines, busyLines: onLine.length, waitSeconds: estimatedWaitSeconds(i, { lines, freeLines, avgCallSeconds: AVG_CALL_SECONDS }) },
     ]),
   );
 }
 
-function listItem(db: MockDb, call: Call, spots: Map<string, QueueSpot>): CallListItem {
+function listItem(db: ShopData, call: Call, spots: Map<string, QueueSpot>): CallListItem {
   return { call, customer: db.customers.find((c) => c.id === call.customerId), queue: spots.get(call.id) };
 }
 
-export function callItems(db: MockDb): CallListItem[] {
+export function callItems(db: ShopData): CallListItem[] {
   const spots = queueSpots(db);
   return [...db.calls].sort(byNewest).map((call) => listItem(db, call, spots));
 }
 
-export function callDetail(db: MockDb, id: string): CallDetail | null {
+export function callDetail(db: ShopData, id: string): CallDetail | null {
   const call = db.calls.find((k) => k.id === id);
   if (!call) return null;
   return {
@@ -168,7 +165,7 @@ export function callDetail(db: MockDb, id: string): CallDetail | null {
   };
 }
 
-export function batchSummary(db: MockDb, batchId: string): BatchSummary | null {
+export function batchSummary(db: ShopData, batchId: string): BatchSummary | null {
   const batch = db.batches.find((b) => b.id === batchId);
   if (!batch) return null;
   const spots = queueSpots(db);
@@ -189,14 +186,14 @@ export function batchSummary(db: MockDb, batchId: string): BatchSummary | null {
   return { batch, calls, counts, outcomes, canChangeTime: canChangeBatchTime(calls.map((x) => x.call.status)) };
 }
 
-export function batchSummaries(db: MockDb): BatchSummary[] {
+export function batchSummaries(db: ShopData): BatchSummary[] {
   return [...db.batches]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((b) => batchSummary(db, b.id))
     .filter((b): b is BatchSummary => !!b);
 }
 
-export function dashboard(db: MockDb, now: Date): DashboardData {
+export function dashboard(db: ShopData, now: Date): DashboardData {
   const today = toDateKey(now);
   const weekEnd = toDateKey(addDays(now, 6));
   const weekAgo = toDateKey(addDays(now, -6));
@@ -259,10 +256,10 @@ export function dashboard(db: MockDb, now: Date): DashboardData {
   };
 }
 
-export const dailyReport = (db: MockDb, now: Date): DailyReport => dailyReportWithScript(db, now).report;
+export const dailyReport = (db: ShopData, now: Date): DailyReport => dailyReportWithScript(db, now).report;
 
 /** The daily report plus the transcript the evening call will speak. */
-export function dailyReportWithScript(db: MockDb, now: Date): { report: DailyReport; turns: Turn[] } {
+export function dailyReportWithScript(db: ShopData, now: Date): { report: DailyReport; turns: Turn[] } {
   const today = toDateKey(now);
   const tomorrow = toDateKey(addDays(now, 1));
   const withCustomer = <T extends { customerId: string }>(xs: T[], key: string) =>
@@ -286,7 +283,6 @@ export function dailyReportWithScript(db: MockDb, now: Date): { report: DailyRep
   const person = (c: Customer) => ({ name: c.name, spokenName: c.language === "bn" ? (c.nameNative ?? c.name) : c.name });
   const script = buildReportScript({
     ownerFirstName: db.shop.ownerName.split(" ")[0],
-    ownerFirstNameBn: db.shop.ownerNameNative?.trim().split(" ")[0] || undefined,
     collected,
     promisesMade: promisesMade.map((p) => ({ ...person(p.customer), amount: p.promise.amount })),
     dueTomorrow: dueTomorrow.map((p) => ({ ...person(p.customer), amount: p.promise.amount })),
@@ -312,7 +308,7 @@ export function dailyReportWithScript(db: MockDb, now: Date): { report: DailyRep
 }
 
 /** The shop's knowledge graph: customers, what they promised, disputed, said and asked for. */
-export function graph(db: MockDb, now: Date): GraphData {
+export function graph(db: ShopData, now: Date): GraphData {
   const nodes: GraphNode[] = [{ id: "shop", type: "shop", label: db.shop.name }];
   const edges: GraphEdge[] = [];
   const recent = toDateKey(addDays(now, -30));
@@ -356,7 +352,7 @@ export function graph(db: MockDb, now: Date): GraphData {
 }
 
 /** Case-insensitive match on Latin or native-script names, first name or full name. */
-export function findCustomerByName(db: MockDb, text: string): Customer | undefined {
+export function findCustomerByName(db: ShopData, text: string): Customer | undefined {
   const q = text.toLowerCase();
   const scored = db.customers
     .map((c) => {

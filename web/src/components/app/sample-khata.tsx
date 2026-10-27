@@ -1,5 +1,5 @@
 import { Galada, Kalam } from "next/font/google";
-import { SAMPLE_KHATA } from "@/lib/api/mock/khata-sample";
+import { SAMPLE_KHATA } from "@/lib/demo/khata-sample";
 import { cn } from "@/lib/utils";
 
 // Handwriting faces, loaded only where the sample page is shown.

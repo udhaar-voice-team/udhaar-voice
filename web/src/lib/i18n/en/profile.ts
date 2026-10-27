@@ -5,14 +5,12 @@ export const profile = {
   you: {
     title: "You",
     name: "Your name",
-    nameNative: "Your name in Bengali (optional)",
-    nameNativeHint: "Asha uses it when she reads your evening summary in Bengali.",
     phone: "Mobile number",
     phoneHint: "Your shop's contact number. The evening summary calls this number.",
     email: "Email",
     emailHint: "You sign in with this.",
   },
-  shop: { title: "Shop", name: "Shop name", area: "Area or market" },
+  shop: { title: "Shop", name: "Shop name" },
   payments: {
     title: "Payments",
     upi: "UPI ID",
@@ -21,7 +19,7 @@ export const profile = {
   },
   account: {
     title: "Account",
-    password: "Changing your password comes with real sign-in.",
+    password: "Changing your password from the app is coming soon.",
   },
   save: "Save profile",
   saved: "Profile saved",

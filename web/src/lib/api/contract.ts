@@ -17,8 +17,8 @@ import type {
 } from "@/lib/domain/types";
 
 /**
- * The API every screen talks to. Today it is implemented by the in-browser mock (lib/api/mock);
- * later by HTTP routes backed by Supabase and Bolna. Screens must only depend on this file.
+ * The API every screen talks to. The browser reaches it through lib/api/http.ts; the server
+ * implements it in lib/server/api.ts on Supabase. Screens must only depend on this file.
  */
 
 export type CustomerSummary = {
@@ -207,23 +207,23 @@ export type Session = { user: User; shop: Shop };
 export type SignInInput = { identifier: string; password: string };
 export type SignUpInput = {
   phone: string;
-  email?: string;
+  /** Required: accounts sign in by email underneath, even when the shopkeeper types their phone. */
+  email: string;
   password: string;
   ownerName: string;
   shopName: string;
+  /** The evening summary's language, and the default for new customers. */
   language: Language;
 };
 
 /** The signed-in shopkeeper's own details, kept on both their account and their shop. */
 export type ProfileInput = {
   name: string;
-  nameNative?: string;
   /** 10-digit Indian mobile: the shop's contact number and where the evening summary is called. */
   phone: string;
   /** Used to sign in. */
   email: string;
   shopName: string;
-  area: string;
   upiId: string;
 };
 
@@ -232,7 +232,7 @@ export interface UdhaarApi {
   getSession(): Promise<Session | null>;
   /** Throws on invalid credentials. */
   signIn(input: SignInInput): Promise<Session>;
-  /** Throws if the phone is already registered or validation fails. */
+  /** Throws if the phone or email is already registered or validation fails. */
   signUp(input: SignUpInput): Promise<Session>;
   signOut(): Promise<void>;
   /** Throws if validation fails or the phone or email belongs to another account. */
@@ -278,6 +278,4 @@ export interface UdhaarApi {
 
   /** Public demo page: a reminder call to the visitor, playing a customer of the demo shop. */
   startDemoCall(input: { phone: string; language: Language; name?: string }): Promise<DemoCallResult>;
-
-  resetDemo(): Promise<void>;
 }

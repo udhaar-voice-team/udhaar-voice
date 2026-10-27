@@ -1,9 +1,8 @@
 import { z } from "zod";
 
 /**
- * Domain model for Udhaar Voice.
- * These schemas mirror the database tables we will create in Supabase, so screens built on them
- * keep working when the mock data layer is replaced by the real one.
+ * Domain model for Udhaar Voice, as the screens see it.
+ * The Supabase tables (web/supabase/migrations) store these; lib/server/rows.ts maps between the two.
  */
 
 export const Language = z.enum(["bn", "hi", "en"]);
@@ -30,16 +29,15 @@ export type User = z.infer<typeof User>;
 
 export const Shop = z.object({
   id: z.string(),
-  /** The user account that owns this shop. Nullable for demo shops seeded without a login. */
+  /** The user account that owns this shop. */
   ownerUserId: z.string().optional(),
   name: z.string().min(1),
   ownerName: z.string().min(1),
-  /** The owner's name in Bengali script, used when the evening report speaks Bengali. */
-  ownerNameNative: z.string().optional(),
   ownerPhone: z.string(),
-  area: z.string(),
+  /** Empty until the shopkeeper adds it on their profile. */
   upiId: z.string(),
-  languages: z.array(Language).min(1),
+  /** The language new customers are called in until it is changed on their page. */
+  defaultCustomerLanguage: Language,
   callingHours: CallingHours,
   reminderGapDays: z.number().int().min(1).max(14),
   maxCallMinutes: z.number().int().min(1).max(10),
