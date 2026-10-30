@@ -30,8 +30,8 @@ What you know:
 How the call goes:
 1. Your greeting already asked whether this is {customer_name}. If it is someone else, or they don't know {customer_name}, say sorry for the trouble and end the call. Never mention the shop's dues, any amount or why you called to anyone but {customer_name}.
 2. Say you are an AI assistant calling from {shop_name}, and gently remind them that {amount_due} is pending.
-3. Ask when they can pay. Get one amount and one day. If they pay part now and the rest later, take the next amount and its day.
-4. Before moving on, repeat the promise with the exact date, for example "So ₹500 on Friday, 30 October". Work the date out from today's date.
+3. Ask when they can pay. Get an amount and a day. If they will pay part now and the rest later, take each part with its own day.
+4. Before moving on, repeat every part with its exact date, for example "So ₹500 on Friday, 30 October", or "So ₹2,000 today, 31 October, and ₹6,200 on Monday, 30 November". Work the dates out from today's date.
 5. If they say they already paid, or the amount is wrong, do not argue. Say the shopkeeper will check, and note what they said.
 6. If they are busy, ask when to call back, and repeat that day and time with the exact date.
 7. If they ask not to be called again, agree politely and end the call.
@@ -105,10 +105,12 @@ export const CALL_LINES: Record<"hangup" | "stillThere", Record<Language, string
 /** Bolna groups extractions in categories; results arrive under extracted_data[category][name]. */
 export const EXTRACTION_CATEGORY = "Udhaar Voice";
 
+/** Extractions we no longer use; the setup removes them from the agent. A single amount and date summed promises made in parts. */
+export const RETIRED_EXTRACTIONS = ["Promised amount", "Promised date"];
+
 export const EXTRACTIONS = {
   outcome: "Call outcome",
-  promiseAmount: "Promised amount",
-  promiseDate: "Promised date",
+  plan: "Payment plan",
   disputeKind: "Dispute type",
   disputeReason: "Dispute details",
   disputeAmount: "Amount the customer says is right",
@@ -148,16 +150,10 @@ export function extractionDefinitions(agentId: string) {
       is_objective: true,
       objective_options: OUTCOMES,
     },
-    { ...base, name: EXTRACTIONS.promiseAmount, question: "If the customer promised to pay, how many rupees did they promise next? Digits only, or empty.", is_subjective: true, is_objective: false, subjective_type: "numeric" },
-    {
-      ...base,
-      name: EXTRACTIONS.promiseDate,
-      question: "If the customer promised to pay, on which date? The agent repeats it with the exact date. Answer as YYYY-MM-DD, or empty.",
-      is_subjective: true,
-      is_objective: false,
-      subjective_type: "regex",
-      subjective_type_config: { pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
-    },
+    text(
+      EXTRACTIONS.plan,
+      "Every payment the customer promised, one per part, as rupees and date, separated by semicolons: for example \"2000 on 2026-10-31; 6200 on 2026-11-30\". \"Now\" or \"today\" is the date of the call. Keep each part separate; never add them up. Empty if they promised nothing.",
+    ),
     { ...base, name: EXTRACTIONS.disputeKind, question: "If the customer disagreed about the dues, what kind of disagreement was it?", is_subjective: false, is_objective: true, objective_options: [...DISPUTE_KINDS, { value: "none", condition: "There was no disagreement." }] },
     text(EXTRACTIONS.disputeReason, "If the customer disagreed about the dues, what exactly did they say, in one English sentence? Empty otherwise."),
     { ...base, name: EXTRACTIONS.disputeAmount, question: "If the customer said a different amount is right, how many rupees? Digits only, or empty.", is_subjective: true, is_objective: false, subjective_type: "numeric" },

@@ -98,6 +98,14 @@ const rupees = (a: Answer | undefined) => {
   const n = v ? Math.round(Number(v.replace(/[^\d.]/g, ""))) : NaN;
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
+/** "2000 on 2026-10-31; 6200 on 2026-11-30" → one promise per part, in date order. */
+export function parsePlan(text: string | undefined): { amount: number; dueDate: string }[] {
+  const parts = [...(text ?? "").matchAll(/₹?\s*(\d[\d,]*)(?:\s*(?:rupees|rs\.?|on|by|@|-|,))*\s*(\d{4}-\d{2}-\d{2})/gi)]
+    .map((m) => ({ amount: Math.round(Number(m[1].replace(/,/g, ""))), dueDate: m[2] }))
+    .filter((p) => Number.isFinite(p.amount) && p.amount > 0);
+  return parts.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+}
+
 const OUTCOMES: CallOutcome[] = ["promised", "disputed", "callback", "refused", "wrong_number", "opted_out", "no_answer"];
 const DISPUTES: DisputeKind[] = ["already_paid", "wrong_amount", "other"];
 
@@ -106,9 +114,8 @@ export function toExtraction(e: Pick<Execution, "extracted_data" | "summary">, s
   const data = e.extracted_data;
   const outcomeAnswer = findAnswer(data, EXTRACTIONS.outcome);
   const said = present(outcomeAnswer)?.toLowerCase().replace(/[\s-]+/g, "_");
-  const amount = rupees(findAnswer(data, EXTRACTIONS.promiseAmount));
-  const dueDate = present(findAnswer(data, EXTRACTIONS.promiseDate));
-  const validDate = dueDate && /^\d{4}-\d{2}-\d{2}$/.test(dueDate) ? dueDate : undefined;
+  // A promise in parts ("₹2,000 now, the rest next month") is one promise per part.
+  const plan = parsePlan(present(findAnswer(data, EXTRACTIONS.plan)));
   let outcome: CallOutcome = OUTCOMES.find((o) => o === said) ?? (status === "completed" ? "refused" : "no_answer");
   if (status !== "completed") outcome = "no_answer";
 
@@ -136,21 +143,21 @@ export function toExtraction(e: Pick<Execution, "extracted_data" | "summary">, s
 
   return {
     outcome,
-    promises: outcome === "promised" && amount && validDate ? [{ amount, dueDate: validDate }] : [],
+    promises: outcome === "promised" ? plan : [],
     dispute,
     // Callback times are said in Indian time.
     callbackAt: callbackMatch ? new Date(`${callbackMatch[1]}T${callbackMatch[2]}:00+05:30`).toISOString() : undefined,
     notes,
     sentiment: mood === "positive" || mood === "negative" ? mood : "neutral",
     confidence,
-    summary: e.summary?.trim() || describe(outcome, amount, validDate),
+    summary: e.summary?.trim() || describe(outcome, plan),
   };
 }
 
-function describe(outcome: CallOutcome, amount?: number, date?: string): string {
+function describe(outcome: CallOutcome, plan: { amount: number; dueDate: string }[]): string {
   switch (outcome) {
     case "promised":
-      return amount && date ? `Promised ₹${amount.toLocaleString("en-IN")} by ${date}.` : "Promised to pay; check the amount and date.";
+      return plan.length ? `Promised ${plan.map((p) => `₹${p.amount.toLocaleString("en-IN")} by ${p.dueDate}`).join(", then ")}.` : "Promised to pay; check the amount and date.";
     case "disputed":
       return "Disagreed with the amount. Check before calling again.";
     case "callback":

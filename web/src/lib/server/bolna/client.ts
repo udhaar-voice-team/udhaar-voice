@@ -8,7 +8,7 @@ function apiKey(): string {
   return key;
 }
 
-async function request<T>(method: "GET" | "POST" | "PUT" | "PATCH", path: string, body?: unknown): Promise<T> {
+async function request<T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: { authorization: `Bearer ${apiKey()}`, "content-type": "application/json" },
@@ -123,3 +123,4 @@ export const listDispositions = async (agentId: string): Promise<Disposition[]> 
   (await request<{ agent_dispositions?: Disposition[] }>("GET", `/dispositions/?agent_id=${encodeURIComponent(agentId)}`)).agent_dispositions ?? [];
 export const createDisposition = (body: unknown) => request<Disposition>("POST", "/dispositions/", body);
 export const updateDisposition = (id: string, body: unknown) => request<Disposition>("PUT", `/dispositions/${encodeURIComponent(id)}`, body);
+export const deleteDisposition = (id: string) => request<unknown>("DELETE", `/dispositions/${encodeURIComponent(id)}`);

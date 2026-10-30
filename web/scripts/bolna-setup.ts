@@ -2,13 +2,14 @@
  * Writes Udhaar Voice's prompts, greeting, webhook and extractions onto the two Bolna agents
  * (BOLNA_REMINDER_AGENT_ID and BOLNA_REPORT_AGENT_ID). English and Hindi voices stay as set on Bolna;
  * Bengali, Odia and Marathi are added with Sarvam voices when an agent doesn't have them yet.
- * Safe to run again after a prompt change: existing extractions are updated, not duplicated.
+ * Safe to run again after a prompt change: existing extractions are updated, not duplicated, and
+ * retired ones are removed.
  *
  * Runs as `npm run bolna:setup`.
  */
-import { createDisposition, getAgent, listDispositions, patchAgent, putAgent, updateDisposition } from "../src/lib/server/bolna/client";
+import { createDisposition, deleteDisposition, getAgent, listDispositions, patchAgent, putAgent, updateDisposition } from "../src/lib/server/bolna/client";
 import { agentIds, appUrl, cronSecret, webhookUrl } from "../src/lib/server/bolna/config";
-import { CALL_LINES, extractionDefinitions, HANGUP_RULE, REMINDER_PROMPT, REMINDER_WELCOME, REPORT_PROMPT, REPORT_WELCOME } from "../src/lib/server/bolna/prompts";
+import { CALL_LINES, extractionDefinitions, RETIRED_EXTRACTIONS, HANGUP_RULE, REMINDER_PROMPT, REMINDER_WELCOME, REPORT_PROMPT, REPORT_WELCOME } from "../src/lib/server/bolna/prompts";
 
 /** Settings PUT takes back from what GET returns. */
 const AGENT_SETTINGS = [
@@ -110,6 +111,10 @@ async function main() {
       await createDisposition(definition);
       console.log(`Extraction created: ${definition.name}`);
     }
+  }
+  for (const old of existing.filter((d) => RETIRED_EXTRACTIONS.includes(d.name))) {
+    await deleteDisposition(old.id);
+    console.log(`Extraction removed: ${old.name}`);
   }
   console.log(`Done. Bolna sends call updates to ${appUrl()}/api/bolna/webhook.`);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findAnswer, parseTranscript, planCallResult, toCallStatus, toExtraction } from "./results";
+import { findAnswer, parsePlan, parseTranscript, planCallResult, toCallStatus, toExtraction } from "./results";
 
 const answer = (objective: string | null, subjective = "", confidence = 0.9) => ({
   subjective,
@@ -55,20 +55,47 @@ describe("transcript", () => {
 describe("reading extractions", () => {
   it("finds an answer by name in any category, or flat", () => {
     expect(findAnswer(extracted({ "Call outcome": answer("promised") }), "call outcome")?.value).toBe("promised");
-    expect(findAnswer({ "Promised amount": "500" }, "Promised amount")?.value).toBe("500");
+    expect(findAnswer({ "Payment plan": "500 on 2026-10-30" }, "Payment plan")?.value).toBe("500 on 2026-10-30");
     expect(findAnswer(null, "x")).toBeUndefined();
   });
 
   it("builds a promise from the amount and the exact date", () => {
     const ex = toExtraction(
-      { extracted_data: extracted({ "Call outcome": answer("promised"), "Promised amount": answer(null, "₹500"), "Promised date": answer(null, "2026-10-30") }), summary: "Will pay Friday." },
+      { extracted_data: extracted({ "Call outcome": answer("promised"), "Payment plan": answer(null, "₹500 on 2026-10-30") }), summary: "Will pay Friday." },
       "completed",
     );
     expect(ex).toMatchObject({ outcome: "promised", promises: [{ amount: 500, dueDate: "2026-10-30" }], summary: "Will pay Friday.", confidence: 0.9 });
   });
 
+  it("keeps a promise in parts as one promise per part, not their total on the last date", () => {
+    const ex = toExtraction(
+      {
+        extracted_data: extracted({
+          "Call outcome": answer("promised"),
+          "Payment plan": answer(null, "2000 on 2026-10-30; 6200 on 2026-11-30"),
+        }),
+      },
+      "completed",
+    );
+    expect(ex.promises).toEqual([
+      { amount: 2000, dueDate: "2026-10-30" },
+      { amount: 6200, dueDate: "2026-11-30" },
+    ]);
+    expect(ex.summary).toBe("Promised ₹2,000 by 2026-10-30, then ₹6,200 by 2026-11-30.");
+  });
+
+  it("reads a payment plan written a few ways", () => {
+    expect(parsePlan("₹6,200 by 2026-11-30, ₹2,000 rupees on 2026-10-30")).toEqual([
+      { amount: 2000, dueDate: "2026-10-30" },
+      { amount: 6200, dueDate: "2026-11-30" },
+    ]);
+    expect(parsePlan("500 - 2026-10-30")).toEqual([{ amount: 500, dueDate: "2026-10-30" }]);
+    expect(parsePlan("")).toEqual([]);
+    expect(parsePlan("next month")).toEqual([]);
+  });
+
   it("skips a promise without a usable date rather than guessing one", () => {
-    const ex = toExtraction({ extracted_data: extracted({ "Call outcome": answer("promised"), "Promised amount": answer(null, "500"), "Promised date": answer(null, "Friday") }) }, "completed");
+    const ex = toExtraction({ extracted_data: extracted({ "Call outcome": answer("promised"), "Payment plan": answer(null, "500 on Friday") }) }, "completed");
     expect(ex.promises).toEqual([]);
   });
 
@@ -113,8 +140,7 @@ describe("what a call adds to the khata", () => {
     {
       extracted_data: extracted({
         "Call outcome": answer("promised"),
-        "Promised amount": answer(null, "500"),
-        "Promised date": answer(null, "2026-10-30"),
+        "Payment plan": answer(null, "500 on 2026-10-30"),
         "Products asked for": answer(null, "Maggi"),
       }),
     },
