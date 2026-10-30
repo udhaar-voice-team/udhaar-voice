@@ -16,7 +16,11 @@ Rate observed: $0.06/min (bundled models, Bolna shared number). Own provider key
 | 2026-10-28 | Test call 5: Deepak (Hindi), asked not to be called again | 0.9 | -$0.06 | $4.19 |
 | 2026-10-28 | Test call 6: evening summary (Bengali); greeting only, summary not read (fixed) | 0.3 | -$0.03 | $4.16 |
 | 2026-10-28 | Test call 7: evening summary (Bengali), read in full, question answered | 0.9 | -$0.06 | $4.10 |
-| 2026-10-29 | Unplanned: Bolna's own auto-reschedule called Deepak back at 6 PM (from test call 3); no answer | 0.3 | -$0.03 | **$4.07** (~68 min) |
+| 2026-10-29 | Unplanned: Bolna's own auto-reschedule called Deepak back at 6 PM (from test call 3); no answer | 0.3 | -$0.03 | $4.07 |
+| 2026-10-29 | Evening summary, demo shop, 6:45 PM: no answer | 0 | $0.00 | $4.07 |
+| 2026-10-29 | Evening summary (Bengali), demo shop, 11:48 PM, placed from the app | 0.6 | -$0.06 | $4.01 |
+| 2026-10-30 | Unplanned: Bolna's own auto-reschedule called Deepak at 9 AM. Booked during test call 1 on 28 Oct ("Friday"), before auto-reschedule was turned off; no conversation | 0.4 | -$0.03 | $3.98 |
+| 2026-10-30 | Correction to match the Bolna wallet (one earlier call cost more than recorded) | | -$0.06 | **$3.92** (~65 min) |
 
 ## Planned: first real calls (call pipeline, 28 Oct)
 
