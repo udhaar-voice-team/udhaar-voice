@@ -409,6 +409,7 @@ export const bn: Dictionary = {
       description: "রঙিন দাগ দেওয়া ঘরগুলো পড়তে অসুবিধা হয়েছে। ঠিক করুন, নতুন খদ্দেরের ফোন নম্বর দিন, তারপর সেভ করুন।",
       columns: { include: "সেভ", name: "নাম", amount: "₹", date: "তারিখ", items: "জিনিস", customer: "খদ্দের" },
       matches: (name: string) => `${name}-এর খাতায় যাবে`,
+      notThem: "উনি নন? নতুন গ্রাহক হিসেবে যোগ করুন",
       newCustomer: "নতুন খদ্দের",
       phonePlaceholder: "মোবাইল নম্বর (ইচ্ছে হলে)",
       lowConfidence: (pct: number) => `পড়তে অসুবিধা (${pct}% নিশ্চিত)। দেখে নিন।`,

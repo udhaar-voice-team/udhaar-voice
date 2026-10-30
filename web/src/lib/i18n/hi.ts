@@ -409,6 +409,7 @@ export const hi: Dictionary = {
       description: "रंगीन घेरे वाले खाने पढ़ने में मुश्किल थे। उन्हें ठीक करें, नए ग्राहकों के फ़ोन नंबर डालें, फिर सेव करें।",
       columns: { include: "सेव", name: "नाम", amount: "₹", date: "तारीख", items: "सामान", customer: "ग्राहक" },
       matches: (name: string) => `${name} के खाते में जाएगा`,
+      notThem: "ये वो नहीं? नए ग्राहक की तरह जोड़ें",
       newCustomer: "नया ग्राहक",
       phonePlaceholder: "मोबाइल नंबर (चाहें तो)",
       lowConfidence: (pct: number) => `पढ़ने में मुश्किल (${pct}% पक्का)। देख लें।`,

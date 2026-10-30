@@ -4,6 +4,7 @@ import type { ScheduleInput } from "@/lib/api/contract";
 import type { ShopData } from "./data";
 import { fakeProvider } from "./fake-provider";
 import { ask, runTool, TOOLS } from "./ask";
+import { findCustomerByName } from "./queries";
 
 const NOW = new Date("2026-10-21T11:00:00");
 const fresh = (): ShopData => ({ ...createSeed(NOW), imports: [], lines: { lines: 2, onLine: [], waiting: [] } });
@@ -85,5 +86,15 @@ describe("asking through the providers", () => {
     expect(failed).toMatchObject({ result: { question: "how much is pending in total?" } });
     const none = await ask(fresh(), "how much is pending in total?", NOW, noSchedule, undefined, []);
     expect("result" in none).toBe(true);
+  });
+});
+
+describe("finding a customer named in a question", () => {
+  it("matches whole words, so a longer name isn't mistaken for a shorter one", () => {
+    const c = fresh().customers[0];
+    const db = { ...fresh(), customers: [{ ...c, id: "amit", name: "Amit Sharma", nameNative: undefined }] };
+    expect(findCustomerByName(db, "How much does Amit owe?")?.id).toBe("amit");
+    expect(findCustomerByName(db, "amit sharma's dues")?.id).toBe("amit");
+    expect(findCustomerByName(db, "How much does Amitabh owe?")).toBeUndefined();
   });
 });

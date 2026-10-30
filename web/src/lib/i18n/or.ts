@@ -409,6 +409,7 @@ export const or: Dictionary = {
       description: "ରଙ୍ଗୀନ ଘେରା ଥିବା ଘରଗୁଡ଼ିକ ପଢ଼ିବାରେ ଅସୁବିଧା ଥିଲା। ସେଗୁଡ଼ିକୁ ସୁଧାରନ୍ତୁ, ନୂଆ ଗ୍ରାହକଙ୍କ ଫୋନ୍ ନମ୍ବର ଦିଅନ୍ତୁ, ତା’ପରେ ସେଭ୍ କରନ୍ତୁ।",
       columns: { include: "ସେଭ୍", name: "ନାମ", amount: "₹", date: "ତାରିଖ", items: "ସାମଗ୍ରୀ", customer: "ଗ୍ରାହକ" },
       matches: (name: string) => `${name} ଙ୍କ ଖାତାକୁ ଯିବ`,
+      notThem: "ସେ ନୁହଁନ୍ତି? ନୂଆ ଗ୍ରାହକ ଭାବେ ଯୋଡ଼ନ୍ତୁ",
       newCustomer: "ନୂଆ ଗ୍ରାହକ",
       phonePlaceholder: "ମୋବାଇଲ୍ ନମ୍ବର (ଇଚ୍ଛା ହେଲେ)",
       lowConfidence: (pct: number) => `ପଢ଼ିବାରେ ଅସୁବିଧା (${pct}% ନିଶ୍ଚିତ)। ଦେଖିନିଅନ୍ତୁ।`,

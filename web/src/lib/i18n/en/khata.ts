@@ -38,6 +38,7 @@ export const khata = {
     description: "Fields with a coloured outline were hard to read. Fix them, add phone numbers for new customers, then save.",
     columns: { include: "Save", name: "Name", amount: "₹", date: "Date", items: "Items", customer: "Customer" },
     matches: (name: string) => `Adds to ${name}`,
+    notThem: "Not them? Add as new",
     newCustomer: "New customer",
     phonePlaceholder: "Mobile number (optional)",
     lowConfidence: (pct: number) => `Hard to read (${pct}% sure). Please check.`,

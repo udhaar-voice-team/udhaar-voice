@@ -409,6 +409,7 @@ export const mr: Dictionary = {
       description: "रंगीबेरंगी गोल असलेले चौकटी वाचायला कठीण होत्या. त्या दुरुस्त करा, नवीन ग्राहकांचे फोन नंबर टाका, मग सेव्ह करा.",
       columns: { include: "सेव्ह", name: "नाव", amount: "₹", date: "तारीख", items: "सामान", customer: "ग्राहक" },
       matches: (name: string) => `${name} च्या खात्यात जाईल`,
+      notThem: "हे ते नाहीत? नवीन ग्राहक म्हणून जोडा",
       newCustomer: "नवीन ग्राहक",
       phonePlaceholder: "मोबाईल नंबर (हवे असल्यास)",
       lowConfidence: (pct: number) => `वाचायला कठीण (${pct}% नक्की). तपासून घ्या.`,

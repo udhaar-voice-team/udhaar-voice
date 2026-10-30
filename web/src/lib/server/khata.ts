@@ -4,7 +4,7 @@ import type { KhataExtraction, KhataLineInput, KhataRow } from "@/lib/api/contra
 import { SAMPLE_KHATA } from "@/lib/demo/khata-sample";
 import type { ShopData } from "./data";
 import type { ReadLine } from "./ai";
-import { findCustomerByName } from "./queries";
+import { findKhataCustomer } from "./queries";
 
 /** Rows read from a khata page, matched against the shop's customers and saved entries. */
 
@@ -23,7 +23,7 @@ export type Line = {
 
 export function toRows(db: ShopData, lines: Line[]): KhataRow[] {
   return lines.map((line, i): KhataRow => {
-    const match = findCustomerByName(db, ` ${line.name.toLowerCase()} ${line.nameNative} `);
+    const match = findKhataCustomer(db, line);
     const saved = match
       ? matchSavedEntry(
           { date: line.date, amount: line.amount, items: line.items, struckAmount: line.struckAmount },

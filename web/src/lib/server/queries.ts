@@ -11,6 +11,7 @@ import {
   formatINR,
   isPromiseBroken,
   nextReminderDate,
+  normalizeIndianMobile,
   toDateKey,
 } from "@/lib/domain/rules";
 import type { Call, CallStatus, Customer, Turn } from "@/lib/domain/types";
@@ -350,19 +351,51 @@ export function graph(db: ShopData, now: Date): GraphData {
   return { nodes, edges };
 }
 
-/** Case-insensitive match on Latin or native-script names, first name or full name. */
+/** Lowercase words with punctuation and extra spaces removed, padded with spaces for whole-word checks. */
+const words = (s: string) => ` ${s.toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim()} `;
+/** Whole words only: "amit" is in "amit kumar" but not in "amitabh". */
+const hasWords = (text: string, name: string) => name.trim() !== "" && text.includes(words(name));
+
+/** A customer named in some text (a question, say): full name first, then first name, Latin or native script, whole words only. */
 export function findCustomerByName(db: ShopData, text: string): Customer | undefined {
-  const q = text.toLowerCase();
+  const q = words(text);
   const scored = db.customers
     .map((c) => {
-      const latin = c.name.toLowerCase();
-      const first = latin.split(" ")[0];
       const native = c.nameNative ?? "";
-      const nativeFirst = native.split(" ")[0];
-      const score = q.includes(latin) || (native && q.includes(native)) ? 2 : q.includes(first) || (nativeFirst && q.includes(nativeFirst)) ? 1 : 0;
-      return { c, score };
+      const full = hasWords(q, c.name) || hasWords(q, native);
+      const first = hasWords(q, c.name.split(" ")[0]) || hasWords(q, native.split(" ")[0]);
+      return { c, score: full ? 2 : first ? 1 : 0 };
     })
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
   return scored[0]?.c;
+}
+
+/**
+ * The saved customer a khata line belongs to. A shop keeps each number once, so a known number
+ * decides it. Otherwise the names have to agree word for word: the same name, or a shorter one
+ * that starts with the same word ("Ramesh" for "Ramesh Kumar"), and only when one customer fits.
+ * A name inside a longer word ("Amit" in "Amitabh") or another surname is never the same person.
+ * When the line has a number the customer must not have another one: two Ramesh Kumars with
+ * their own numbers are two people.
+ */
+export function findKhataCustomer(db: ShopData, line: { name: string; nameNative?: string; phone?: string }): Customer | undefined {
+  const phone = line.phone ? normalizeIndianMobile(line.phone) : null;
+  const byPhone = phone ? db.customers.find((c) => c.phone === phone) : undefined;
+  if (byPhone) return byPhone;
+  const pool = db.customers.filter((c) => !(phone && c.phone));
+  const named = (fits: (a?: string, b?: string) => boolean) => pool.filter((c) => fits(c.name, line.name) || fits(c.nameNative, line.nameNative));
+  const exact = named((a, b) => !!a?.trim() && !!b?.trim() && words(a) === words(b));
+  if (exact.length) return exact.length === 1 ? exact[0] : undefined;
+  const partial = named(shortFor);
+  return partial.length === 1 ? partial[0] : undefined;
+}
+
+/** One name is a shorter form of the other: same first word, and every word of it in the longer one. */
+function shortFor(a?: string, b?: string): boolean {
+  const x = words(a ?? "").trim().split(" ").filter(Boolean);
+  const y = words(b ?? "").trim().split(" ").filter(Boolean);
+  if (!x.length || !y.length) return false;
+  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+  return short[0] === long[0] && short.every((w) => long.includes(w));
 }

@@ -353,9 +353,16 @@ function Review({
                     )}
                     {r.nameNative ? <span lang="bn">{r.nameNative}</span> : null}
                   </label>
-                  <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", r.matchCustomerId ? "bg-paid-soft text-paid" : "bg-callback-soft text-callback")}>
-                    {r.matchCustomerId ? t.matches(nameOf(r.matchCustomerId) ?? r.name.value) : t.newCustomer}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.matchCustomerId ? (
+                      <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => update(r.id, { matchCustomerId: undefined, saved: undefined, action: "add", phone: "" })}>
+                        {t.notThem}
+                      </Button>
+                    ) : null}
+                    <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", r.matchCustomerId ? "bg-paid-soft text-paid" : "bg-callback-soft text-callback")}>
+                      {r.matchCustomerId ? t.matches(nameOf(r.matchCustomerId) ?? r.name.value) : t.newCustomer}
+                    </span>
+                  </div>
                 </div>
                 {r.saved ? <SavedChoice row={r} onChange={(action) => update(r.id, { action })} /> : null}
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1.4fr_0.8fr_1fr]">

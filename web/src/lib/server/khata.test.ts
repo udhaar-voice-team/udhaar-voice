@@ -73,3 +73,42 @@ describe("typed and spreadsheet lines", () => {
     expect(toRows(fresh(), lines)[0]).toMatchObject({ phone: "9876543210", action: "add" });
   });
 });
+
+describe("matching lines to saved customers", () => {
+  const customer = (db: ShopData) => db.customers[0];
+  const line = (name: string, extra: Partial<Parameters<typeof toRows>[1][number]> = {}) => ({
+    name,
+    nameNative: "",
+    amount: 100,
+    date: "2026-10-20",
+    items: "",
+    confidence: { name: 1, amount: 1, date: 1, items: 1 },
+    ...extra,
+  });
+
+  it("matches whole words only, never a name inside a longer one or another surname", () => {
+    const db = { ...fresh(), customers: [{ ...customer(fresh()), id: "amit", name: "Amit Sharma", nameNative: undefined }] };
+    const [whole, upper, inside, otherSurname, firstOnly] = toRows(db, [line("Amit Sharma"), line("  AMIT  sharma. "), line("Amitabh Bachhan"), line("Amit Kumar"), line("Amit")]);
+    expect(whole.matchCustomerId).toBe("amit");
+    expect(upper.matchCustomerId).toBe("amit");
+    expect(inside.matchCustomerId).toBeUndefined();
+    expect(otherSurname.matchCustomerId).toBeUndefined();
+    expect(firstOnly.matchCustomerId).toBe("amit");
+  });
+
+  it("leaves a first name alone when two customers share it", () => {
+    const c = customer(fresh());
+    const db = { ...fresh(), customers: [{ ...c, id: "a", name: "Amit Sharma" }, { ...c, id: "b", name: "Amit Das", phone: "+919000000002" }] };
+    expect(toRows(db, [line("Amit")])[0].matchCustomerId).toBeUndefined();
+    expect(toRows(db, [line("Amit Das")])[0].matchCustomerId).toBe("b");
+  });
+
+  it("goes by the number when a line has one", () => {
+    const db = fresh();
+    const c = customer(db);
+    const local = c.phone.replace("+91", "");
+    const [sameNumber, sameNameOtherNumber] = toRows(db, [line("Someone Else", { phone: local }), line(c.name, { phone: "9000000001" })]);
+    expect(sameNumber.matchCustomerId).toBe(c.id);
+    expect(sameNameOtherNumber.matchCustomerId).toBeUndefined();
+  });
+});
