@@ -6,7 +6,7 @@ export const khata = {
     uploadPhoto: "Upload photo",
     typeEntries: "Type entries",
     importFile: "Import CSV or Excel",
-    fileHint: "Spreadsheets need a name and an amount column; items, date and phone are optional.",
+    fileHint: "Any column names work: the name, amount, date, items and phone columns are found for you.",
     fileEmpty: "No lines with a name and an amount in that file.",
     fileSkipped: (n: number) => `${n} ${n === 1 ? "row" : "rows"} without a name or amount left out.`,
     fileError: "Couldn't read that file. Use a .csv or .xlsx file.",
@@ -32,7 +32,7 @@ export const khata = {
     continue: "Check and save",
     invalid: "Every line needs a name and an amount above zero.",
   },
-  reading: { title: "Reading the page…", steps: ["Finding the lines", "Reading names", "Reading amounts and dates"] },
+  reading: { title: "Reading the page…", columns: "Reading the columns…", steps: ["Finding the lines", "Reading names", "Reading amounts and dates"] },
   review: {
     title: "Check what was read",
     description: "Fields with a coloured outline were hard to read. Fix them, add phone numbers for new customers, then save.",

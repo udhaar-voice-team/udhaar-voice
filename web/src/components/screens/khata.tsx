@@ -21,7 +21,7 @@ import { shrinkPhoto } from "@/lib/image";
 import type { AiProvider, KhataExtraction, KhataLineInput, KhataRow, KhataRowAction, KhataSaveResult, KhataSource } from "@/lib/api/contract";
 import { untilAnswered } from "@/lib/api/steps";
 import { useLeaveWarning } from "@/hooks/use-leave-warning";
-import { parseCsv, rowsToLines } from "@/lib/khata-file";
+import { parseCsv, rowsToLines, sampleRows } from "@/lib/khata-file";
 import { CameraDialog } from "@/components/app/camera-dialog";
 import { ManualEntryDialog } from "@/components/app/manual-entry-dialog";
 import { attempt, useApiMutation, useCustomers, useKhataImports } from "@/lib/api/hooks";
@@ -87,7 +87,8 @@ export function KhataScreen() {
     const url = file ? URL.createObjectURL(file) : undefined;
     const since = resume?.since ?? Date.now();
     const scanId = source === "upload" ? (resume?.scanId ?? crypto.randomUUID()) : undefined;
-    setStage({ kind: "reading", source, imageUrl: url, since, backup: !!resume?.provider });
+    // Typed lines and spreadsheet rows need no model here, so they go straight to the review.
+    if (source === "upload" || source === "sample") setStage({ kind: "reading", source, imageUrl: url, since, backup: !!resume?.provider });
     try {
       // A resumed read sends no photo: the server reads the one it kept.
       const photo = file ? await shrinkPhoto(file).catch(() => file) : undefined;
@@ -135,16 +136,36 @@ export function KhataScreen() {
     else setCameraOpen(true);
   };
 
+  /**
+   * A model works out which column is which from the first rows, whatever the shopkeeper named
+   * them; the rows are then turned into lines here. Without a model, the column names decide.
+   */
   const importSheet = async (file: File) => {
+    let rows: unknown[][];
     try {
-      const rows: unknown[][] = /\.csv$/i.test(file.name) || file.type === "text/csv" ? parseCsv(await file.text()) : await readSheet(file);
-      const { lines, skipped } = rowsToLines(rows, toDateKey(new Date()));
-      if (lines.length === 0) return void toast.error(t.start.fileEmpty);
-      if (skipped) toast.message(t.start.fileSkipped(skipped));
-      void read("file", undefined, lines);
+      rows = /\.csv$/i.test(file.name) || file.type === "text/csv" ? parseCsv(await file.text()) : await readSheet(file);
     } catch {
-      toast.error(t.start.fileError);
+      return void toast.error(t.start.fileError);
     }
+    if (rows.length === 0) return void toast.error(t.start.fileEmpty);
+    const id = ++run.current;
+    setStage({ kind: "reading", source: "file", since: Date.now(), backup: false });
+    const columns = await untilAnswered(
+      (provider) => api.readKhataColumns({ rows: sampleRows(rows), provider }),
+      () => {
+        if (run.current === id) setStage((s) => (s.kind === "reading" ? { ...s, backup: true } : s));
+      },
+    ).catch(() => undefined);
+    if (run.current !== id) return;
+    const today = toDateKey(new Date());
+    let result = rowsToLines(rows, today, columns);
+    if (result.lines.length === 0 && columns) result = rowsToLines(rows, today);
+    if (result.lines.length === 0) {
+      setStage({ kind: "start" });
+      return void toast.error(t.start.fileEmpty);
+    }
+    if (result.skipped) toast.message(t.start.fileSkipped(result.skipped));
+    void read("file", undefined, result.lines);
   };
 
   const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -217,7 +238,20 @@ export function KhataScreen() {
         </div>
       ) : null}
 
-      {stage.kind === "reading" ? (
+      {stage.kind === "reading" && stage.source === "file" ? (
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle className="text-lg">
+              <AiProgress label={t.reading.columns} since={stage.since} backup={stage.backup} slowAfter={15} />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" onClick={cancel}>
+              {common.actions.cancel}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : stage.kind === "reading" ? (
         <div className="grid gap-6 lg:grid-cols-2">
           <PagePreview imageUrl={stage.imageUrl} sample={stage.source === "sample"} scanning />
           <Card>

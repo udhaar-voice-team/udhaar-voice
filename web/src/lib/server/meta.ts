@@ -1,5 +1,8 @@
 import {
   baseMime,
+  COLUMNS_INSTRUCTION,
+  COLUMNS_SCHEMA,
+  columnsPrompt,
   KHATA_INSTRUCTION,
   KHATA_SCHEMA,
   khataPrompt,
@@ -159,6 +162,9 @@ async function answerWithTools(question: string, tools: ToolSpec[], run: ToolRun
   return { answer: "", calls };
 }
 
+const mapColumns: Provider["mapColumns"] = (sample) =>
+  json(metaModel(), 20_000, COLUMNS_INSTRUCTION, [{ type: "text", text: columnsPrompt(sample) }], "spreadsheet_columns", COLUMNS_SCHEMA);
+
 export const meta: Provider = {
   name: "meta",
   configured: metaConfigured,
@@ -166,4 +172,5 @@ export const meta: Provider = {
   readKhataPhoto,
   transcribeQuestion,
   answerWithTools,
+  mapColumns,
 };

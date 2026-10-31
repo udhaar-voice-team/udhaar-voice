@@ -32,6 +32,8 @@ export type Provider = {
   readKhataPhoto: (image: Uint8Array, mime: string, today: string) => Promise<ReadLine[]>;
   transcribeQuestion: (audio: Uint8Array, mime: string) => Promise<{ text: string; language: Language }>;
   answerWithTools: (question: string, tools: ToolSpec[], run: ToolRun, instruction: string) => Promise<ToolAnswer>;
+  /** Which column of a spreadsheet holds what, from its first rows. */
+  mapColumns: (sample: string[][]) => Promise<ColumnMap>;
 };
 
 /**
@@ -108,6 +110,49 @@ export const khataPrompt = (today: string) => `Today is ${today}. Read every ent
 
 /** Rows without a name or a positive amount aren't entries. */
 export const usableLines = (rows: ReadLine[]) => rows.filter((r) => r.name?.trim() && Number.isFinite(r.amount) && r.amount > 0);
+
+/* ---------------------------------------------------------------- spreadsheets */
+
+/** Column numbers from 0, or -1 when the sheet has no such column. */
+export type ColumnMap = {
+  header_rows: number;
+  name: number;
+  name_native: number;
+  amount: number;
+  paid: number;
+  items: number;
+  date: number;
+  phone: number;
+  date_order: "dmy" | "mdy" | "ymd";
+};
+
+const column = (description: string) => ({ type: "integer", minimum: -1, description });
+export const COLUMNS_SCHEMA = {
+  type: "object",
+  properties: {
+    header_rows: { type: "integer", minimum: 0, description: "How many rows at the top are headings or titles, not entries." },
+    name: column("The customer's name."),
+    name_native: column("A second name column in an Indian script, if the name is also written that way."),
+    amount: column("What the customer owes or took on credit."),
+    paid: column("A separate column of money the customer has paid back, if any."),
+    items: column("What was bought."),
+    date: column("The entry's date."),
+    phone: column("The customer's mobile number."),
+    date_order: { type: "string", enum: ["dmy", "mdy", "ymd"], description: "How dates are written: day first, month first or year first." },
+  },
+  required: ["header_rows", "name", "name_native", "amount", "paid", "items", "date", "phone", "date_order"],
+};
+
+export const COLUMNS_INSTRUCTION = `You look at the first rows of a spreadsheet a small shop in India keeps of goods given on credit (a khata), and say which column holds what. Column numbers start at 0; use -1 when there is no such column.
+Shopkeepers name columns any way they like, in English, Hindi, Bengali, Odia, Marathi or a mix, or give no headings at all: judge by the values too.
+- amount is what the customer owes or took on credit: "credit", "balance", "baki", "udhaar", "due", "total", "outstanding" and so on. If there is a running balance column, that is amount.
+- paid is only a separate column of money paid back ("jama", "paid", "received"), never the balance itself.
+- date_order: Indian sheets usually write the day first (28/10/2026). Say month first only when the values show it, such as 10/28/2026.`;
+
+export const columnsPrompt = (sample: string[][]) => `The first rows, as JSON (one array per row):\n${JSON.stringify(sample)}`;
+
+/** The first rows sent to a model: a few, short, enough to tell the columns apart. */
+export const columnSample = (rows: string[][]) => rows.slice(0, 8).map((r) => r.slice(0, 12).map((c) => String(c ?? "").slice(0, 40)));
 
 /* ---------------------------------------------------------------- spoken questions */
 

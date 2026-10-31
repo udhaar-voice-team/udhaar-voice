@@ -33,6 +33,7 @@ export const customers = {
       recordPayment: "Record payment",
       addEntry: "Add entry",
       editPhone: "Edit phone number",
+      editLanguage: "Call language",
       editName: "Edit name",
       remove: "Remove customer",
       removeConfirm: "They leave your lists and won't be called again. Their history is kept.",
@@ -120,6 +121,7 @@ export const customers = {
       invalid: "Enter the customer's name.",
     },
     removed: (name: string) => `${name} removed. Their history is kept.`,
+    languageDialog: { title: "Call language", description: "Asha calls this customer, and WhatsApp reminders go, in this language.", saved: "Language saved." },
     phoneDialog: {
       title: "Phone number",
       description: "Indian mobile number.",

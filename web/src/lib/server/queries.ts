@@ -139,17 +139,19 @@ export function candidates(db: ShopData, now: Date): EligibleCustomer[] {
     } else if (lastOutcome !== "callback" && s.balance < MIN_DUE_FOR_CALL) reason = `Under ${formatINR(MIN_DUE_FOR_CALL)}: WhatsApp reminders only`;
     else if (s.nextPromise && !broken) reason = `Promised ${formatINR(s.nextPromise.amount)} by ${fmtDay(s.nextPromise.dueDate)}. No reminder before then.`;
     else if (callsThisMonth >= CALLS_PER_CUSTOMER_PER_MONTH) reason = `Called ${callsThisMonth} times this month already`;
-    else if (lastOutcome !== "callback" && !broken && !whatsapp.ready) {
-      reason = whatsapp.callableFrom
-        ? `WhatsApp sent ${fmtDay(whatsapp.sentAt!.toISOString())}. Asha can call from ${fmtDay(whatsapp.callableFrom.toISOString())}.`
-        : "Send a WhatsApp reminder first. Asha calls if nothing comes in after 3 days.";
-    }
     const callbackAt = lastOutcome === "callback" ? lastAnswered?.extraction?.callbackAt : undefined;
+    // Advice, not a rule: a free WhatsApp reminder first often brings the money without a call.
+    const whatsappAdvice =
+      lastOutcome === "callback" || broken || whatsapp.ready
+        ? undefined
+        : whatsapp.sentAt
+          ? `WhatsApp sent ${fmtDay(whatsapp.sentAt.toISOString())}. Waiting until ${fmtDay(whatsapp.callableFrom!.toISOString())} gives them time to pay.`
+          : "No WhatsApp reminder yet. It's free, and often enough without a call.";
     const note = s.openDispute
       ? `Open dispute. The agent won't ask for the disputed ${s.openDispute.amount ? formatINR(s.openDispute.amount) : "amount"}.`
       : callbackAt
         ? `Asked to be called back ${format(parseISO(callbackAt), "EEE h:mm a")}.`
-        : undefined;
+        : whatsappAdvice;
     return { ...s, eligible: !reason, reason, note };
   });
 }

@@ -43,3 +43,35 @@ describe("spreadsheet rows", () => {
     expect(rowsToLines([["Haru Kaka", 300, "oil"]], TODAY).lines).toEqual([{ name: "Haru Kaka", amount: 300, items: "oil", date: TODAY, phone: undefined }]);
   });
 });
+
+describe("any column names", () => {
+  it("knows many common names, with units and in Indian languages", () => {
+    const { lines } = rowsToLines(
+      [
+        ["Party Name", "Balance (Rs)", "Particulars", "Dt", "Mob."],
+        ["Sunita", "2,400", "rice", "1/10/26", "9876543210"],
+      ],
+      TODAY,
+    );
+    expect(lines).toEqual([{ name: "Sunita", amount: 2400, items: "rice", date: "2026-10-01", phone: "9876543210" }]);
+    expect(rowsToLines([["ग्राहक", "उधार"], ["Bapi", "500"]], TODAY).lines[0]).toMatchObject({ name: "Bapi", amount: 500 });
+  });
+
+  it("follows a model's column map: title rows, a paid column taken off, month-first dates", () => {
+    const rows = [
+      ["Shop khata Oct"],
+      ["Cust", "Udhaar", "Jama", "When"],
+      ["Rina", "1000", "400", "10/28/2026"],
+      ["Paid up", "300", "300", "10/27/2026"],
+    ];
+    const columns = { headerRows: 2, name: 0, nameNative: -1, amount: 1, paid: 2, items: -1, date: 3, phone: -1, dateOrder: "mdy" as const };
+    const { lines, skipped } = rowsToLines(rows, TODAY, columns);
+    expect(lines).toEqual([{ name: "Rina", amount: 600, items: "", date: "2026-10-28", phone: undefined }]);
+    expect(skipped).toBe(1);
+  });
+
+  it("reads month-first dates only when told to", () => {
+    expect(toDate("10/13/2026", TODAY, "mdy")).toBe("2026-10-13");
+    expect(toDate("2026/10/13", TODAY)).toBe("2026-10-13");
+  });
+});

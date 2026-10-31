@@ -11,7 +11,7 @@ import { BOLNA_LANGUAGE, LANGUAGE_NAMES, reminderGreeting } from "./bolna/prompt
 import { loadLines, loadShop, loadShopData, toCall, type CallRow, type ShopData } from "./data";
 import { env } from "./env";
 import { fromInputLines, fromReadLines, photoPath, readSamplePage, toRows } from "./khata";
-import { step } from "./ai";
+import { columnSample, step } from "./ai";
 import { aiConfigured, PROVIDERS } from "./providers";
 import { batchSummaries, batchSummary, callDetail, callItems, candidates, customerDetail, dailyReport, dashboard, graph, planUsage, summaries } from "./queries";
 import { runDispatcher } from "./dispatcher";
@@ -469,6 +469,31 @@ export const serverApi: ServerApi = {
     if ("next" in read) return read;
     if (read.result.lines.length === 0) throw new Error("No entries found on that page. Try a clearer photo.");
     return { result: { scanId, source: "upload", rows: toRows(db, fromReadLines(read.result.lines, ctx.now)), model: read.result.model } };
+  },
+
+  readKhataColumns: async ({ sb }, { rows, provider }) => {
+    await requireSession(sb);
+    if (!aiConfigured()) throw new Error("Reading spreadsheets isn't set up yet (GEMINI_API_KEY or META_API_KEY).");
+    const sample = columnSample(Array.isArray(rows) ? rows.filter(Array.isArray) : []);
+    if (sample.length === 0) throw new Error("That file is empty.");
+    const width = Math.max(...sample.map((r) => r.length));
+    const col = (n: number) => (Number.isInteger(n) && n >= 0 && n < width ? n : -1);
+    const read = await step(PROVIDERS, provider, "spreadsheet columns", (p) => p.mapColumns(sample));
+    if ("next" in read) return read;
+    const m = read.result;
+    return {
+      result: {
+        headerRows: Math.min(Math.max(0, Math.round(m.header_rows) || 0), sample.length),
+        name: col(m.name),
+        nameNative: col(m.name_native),
+        amount: col(m.amount),
+        paid: col(m.paid),
+        items: col(m.items),
+        date: col(m.date),
+        phone: col(m.phone),
+        dateOrder: m.date_order === "mdy" || m.date_order === "ymd" ? m.date_order : "dmy",
+      },
+    };
   },
 
   saveKhata: async (ctx, { scanId, source, rows, model }) => {

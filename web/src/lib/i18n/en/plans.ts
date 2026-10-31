@@ -29,7 +29,7 @@ export const plans = {
     title: "How reminders work",
     steps: (minDue: string, perCustomer: number) => [
       "Send a WhatsApp reminder from the customer's page.",
-      "If nothing comes in after 3 days, Asha can call.",
+      "If nothing comes in within 3 days, call with Asha. You can call any time; WhatsApp first is free.",
       `Dues under ${minDue} get WhatsApp only, and nobody is called more than ${perCustomer} times a month.`,
     ],
   },

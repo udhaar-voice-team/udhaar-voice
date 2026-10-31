@@ -55,6 +55,7 @@ export const httpApi: UdhaarApi = {
     if (input.provider) form.append("provider", input.provider);
     return call("extractKhata", { body: form });
   },
+  readKhataColumns: json("readKhataColumns"),
   saveKhata: json("saveKhata"),
   listKhataImports: json("listKhataImports"),
   undoKhataImport: json("undoKhataImport"),

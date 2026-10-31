@@ -16,6 +16,7 @@ import {
   Trash2,
   UserPen,
   QrCode,
+  Languages,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -50,7 +51,7 @@ import { api } from "@/lib/api";
 import type { CustomerDetail } from "@/lib/api/contract";
 import { attempt, useApiMutation, useCustomer, useReminderCandidates, useShop } from "@/lib/api/hooks";
 import { formatINR, isPromiseBroken, normalizeIndianMobile, payPageLink, toDateKey, upiLink, whatsappShareLink } from "@/lib/domain/rules";
-import type { PaymentPromise } from "@/lib/domain/types";
+import { LANGUAGES, type Language, type PaymentPromise } from "@/lib/domain/types";
 import { dictionaryFor, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Initial } from "./customers";
@@ -211,6 +212,7 @@ function CustomerActions({ d }: { d: CustomerDetail }) {
   const [nameOpen, setNameOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const [languageOpen, setLanguageOpen] = useState(false);
   // The dashboard's "Update number" links here with #phone. This component only renders in the
   // browser (after the customer has loaded), so reading the hash while creating state is safe.
   const [phoneOpen, setPhoneOpen] = useState(() => typeof window !== "undefined" && window.location.hash === "#phone");
@@ -353,6 +355,9 @@ function CustomerActions({ d }: { d: CustomerDetail }) {
           <DropdownMenuItem onClick={() => setPhoneOpen(true)}>
             <Phone /> {c.actions.editPhone}
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setLanguageOpen(true)}>
+            <Languages /> {c.actions.editLanguage}
+          </DropdownMenuItem>
           <DropdownMenuItem
             onClick={async () => {
               if (await attempt(update.mutateAsync({ optedOut: !d.customer.optedOut }))) toast.success(d.customer.optedOut ? c.optedIn : c.optedOut);
@@ -371,6 +376,7 @@ function CustomerActions({ d }: { d: CustomerDetail }) {
 
       <PaymentDialog open={payOpen} onOpenChange={setPayOpen} customerId={d.customer.id} suggested={d.nextPromise?.amount ?? d.balance} />
       <EntryDialog open={entryOpen} onOpenChange={setEntryOpen} customerId={d.customer.id} />
+      <LanguageDialog open={languageOpen} onOpenChange={setLanguageOpen} current={d.customer.language} onSave={(language) => update.mutateAsync({ language })} />
       <PhoneDialog open={phoneOpen} onOpenChange={setPhoneOpen} current={d.customer.phone} onSave={(phone) => update.mutateAsync({ phone })} />
       <ScheduleDialog
         open={scheduleOpen}
@@ -638,6 +644,35 @@ function EntryDialog({ open, onOpenChange, customerId }: { open: boolean; onOpen
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** The language Asha calls this customer in, and WhatsApp reminders go in. Saved as soon as one is picked. */
+function LanguageDialog({ open, onOpenChange, current, onSave }: { open: boolean; onOpenChange: (v: boolean) => void; current: Language; onSave: (language: Language) => Promise<unknown> }) {
+  const t = useT();
+  const l = t.customers.detail.languageDialog;
+  const choose = async (language: Language) => {
+    if (language === current) return onOpenChange(false);
+    if (!(await attempt(onSave(language)))) return;
+    toast.success(l.saved);
+    onOpenChange(false);
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{l.title}</DialogTitle>
+          <DialogDescription>{l.description}</DialogDescription>
+        </DialogHeader>
+        <ToggleGroup type="single" variant="outline" className="flex-wrap" value={current} onValueChange={(v) => v && void choose(v as Language)}>
+          {LANGUAGES.map((x) => (
+            <ToggleGroupItem key={x} value={x}>
+              {t.common.language[x]}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </DialogContent>
     </Dialog>
   );

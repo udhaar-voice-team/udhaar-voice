@@ -145,16 +145,16 @@ describe("plans and the reminder steps", () => {
     expect(eligibility(fresh(), "c06")?.reason).toMatch(/WhatsApp reminders only/);
   });
 
-  it("calls after a WhatsApp reminder has had three days, and starts over after a payment", () => {
+  it("can call at once, and suggests WhatsApp first until a reminder has had three days with no payment", () => {
     const db = fresh();
     db.usage.whatsapp = [];
-    expect(eligibility(db, "c12")?.reason).toMatch(/WhatsApp reminder first/);
+    expect(eligibility(db, "c12")).toMatchObject({ eligible: true, note: expect.stringMatching(/No WhatsApp reminder yet/) });
     db.usage.whatsapp = [{ customerId: "c12", at: "2026-10-20T10:00:00" }];
-    expect(eligibility(db, "c12")?.reason).toMatch(/Asha can call from Fri 23 Oct/);
+    expect(eligibility(db, "c12")).toMatchObject({ eligible: true, note: expect.stringMatching(/Waiting until Fri 23 Oct/) });
     db.usage.whatsapp = [{ customerId: "c12", at: "2026-10-17T10:00:00" }];
-    expect(eligibility(db, "c12")?.eligible).toBe(true);
+    expect(eligibility(db, "c12")?.note).toBeUndefined();
     db.payments.push({ id: "p-new", customerId: "c12", amount: 100, method: "cash", date: "2026-10-20", createdAt: "2026-10-20T12:00:00" });
-    expect(eligibility(db, "c12")?.reason).toMatch(/WhatsApp reminder first/);
+    expect(eligibility(db, "c12")?.note).toMatch(/No WhatsApp reminder yet/);
   });
 
   it("waits for a promise's date, and calls once it is missed", () => {

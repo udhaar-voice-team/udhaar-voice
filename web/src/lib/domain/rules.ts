@@ -300,7 +300,7 @@ export const CALL_PACK = { price: 49, calls: 10 } as const;
 export const MIN_DUE_FOR_CALL = 300;
 /** Reminder calls to one customer in a calendar month. */
 export const CALLS_PER_CUSTOMER_PER_MONTH = 2;
-/** Days after a WhatsApp reminder before Asha may call, giving the customer time to pay or reply. */
+/** Days a WhatsApp reminder is given before a call is suggested, for the customer to pay or reply. */
 export const WHATSAPP_WAIT_DAYS = 3;
 /** A WhatsApp reminder older than this no longer counts towards a call. */
 export const WHATSAPP_VALID_DAYS = 30;
@@ -332,9 +332,9 @@ export function summaryCallToday(plan: PlanId, now: Date): boolean {
 }
 
 /**
- * Whether Asha may call yet, going by WhatsApp: a reminder sent at least WHATSAPP_WAIT_DAYS ago,
- * within the last WHATSAPP_VALID_DAYS, with no payment since it. A missed promise or a request to
- * be called back skips this: the customer has already been in touch.
+ * Whether a WhatsApp reminder has had its time: sent at least WHATSAPP_WAIT_DAYS ago, within the
+ * last WHATSAPP_VALID_DAYS, with no payment since it. Advice for the shopkeeper, not a rule: Asha
+ * can call before then, but the free WhatsApp reminder often brings the money without a call.
  */
 export function whatsappStep(
   sent: Date[],

@@ -149,6 +149,18 @@ export type KhataRow = {
 export type KhataSource = "sample" | "upload" | "manual" | "file";
 /** `model` is the model that read a photo. */
 export type KhataExtraction = { scanId: string; source: KhataSource; rows: KhataRow[]; model?: string };
+/** Which spreadsheet column holds what, numbered from 0; -1 when there is none. `paid` is subtracted from `amount`. */
+export type KhataColumns = {
+  headerRows: number;
+  name: number;
+  nameNative: number;
+  amount: number;
+  paid: number;
+  items: number;
+  date: number;
+  phone: number;
+  dateOrder: "dmy" | "mdy" | "ymd";
+};
 /** One khata line typed in or read from a spreadsheet. `date` is YYYY-MM-DD. */
 export type KhataLineInput = { name: string; nameNative?: string; amount: number; items: string; date: string; phone?: string };
 export type KhataSaveResult = { importId: string; added: number; updated: number; newCustomers: number };
@@ -314,6 +326,8 @@ export interface UdhaarApi {
    * "sample" reads the drawn sample page; "manual" and "file" take `lines` typed in or read from a spreadsheet.
    */
   extractKhata(input: { source: KhataSource; photo?: Blob; scanId?: string; lines?: KhataLineInput[]; provider?: AiProvider }): Promise<AiStep<KhataExtraction>>;
+  /** Works out a spreadsheet's columns from its first rows, whatever the shopkeeper named them. */
+  readKhataColumns(input: { rows: string[][]; provider?: AiProvider }): Promise<AiStep<KhataColumns>>;
   saveKhata(input: { scanId: string; source: KhataExtraction["source"]; rows: KhataRow[]; model?: string }): Promise<KhataSaveResult>;
   /** Recent photo imports, newest first. */
   listKhataImports(): Promise<KhataImportSummary[]>;

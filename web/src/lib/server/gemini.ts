@@ -1,6 +1,9 @@
 import { GoogleGenAI, type Content, type GenerateContentConfig, type GenerateContentResponse } from "@google/genai";
 import {
   baseMime,
+  COLUMNS_INSTRUCTION,
+  COLUMNS_SCHEMA,
+  columnsPrompt,
   KHATA_INSTRUCTION,
   KHATA_SCHEMA,
   khataPrompt,
@@ -128,6 +131,9 @@ async function converse(model: string, timeout: number, deadline: number, questi
   return { answer: "", calls };
 }
 
+const mapColumns: Provider["mapColumns"] = (sample) =>
+  json("spreadsheet columns", [12_000, 10_000], [{ role: "user", parts: [{ text: columnsPrompt(sample) }] }], COLUMNS_SCHEMA, COLUMNS_INSTRUCTION);
+
 export const gemini: Provider = {
   name: "gemini",
   configured: geminiConfigured,
@@ -135,4 +141,5 @@ export const gemini: Provider = {
   readKhataPhoto,
   transcribeQuestion,
   answerWithTools,
+  mapColumns,
 };

@@ -1,21 +1,38 @@
-import type { KhataLineInput } from "@/lib/api/contract";
+import type { KhataColumns, KhataLineInput } from "@/lib/api/contract";
 
 /**
- * Turns a spreadsheet (CSV or Excel rows) into khata lines. Columns are found by their header in
- * English, Hindi or Bengali; without a header row, the order is name, amount, items, date, phone.
+ * Turns a spreadsheet (CSV or Excel rows) into khata lines. Which column holds what comes from an
+ * AI model reading the first rows (`readKhataColumns`), so any column names work; when no model
+ * answers, columns are found by common names in English and Indian languages, and without a
+ * header row the order is name, amount, items, date, phone.
  */
 
-type Field = keyof KhataLineInput;
+type Field = "name" | "amount" | "paid" | "items" | "date" | "phone";
 
-const HEADERS: Record<Exclude<Field, "nameNative">, RegExp> = {
-  name: /^(name|customer|customer name|naam|नाम|ग्राहक|নাম|খদ্দের)$/i,
-  amount: /^(amount|amt|rupees|rs\.?|₹|due|dues|baki|baaki|बाकी|रकम|টাকা|বাকি)$/i,
-  items: /^(items?|details?|goods|saman|सामान|माल|জিনিস|মাল)$/i,
-  date: /^(date|day|tarikh|तारीख|তারিখ)$/i,
-  phone: /^(phone|mobile|number|phone number|फ़ोन|फोन|मोबाइल|ফোন|মোবাইল)$/i,
+/** Common column names, compared as lowercase words without punctuation. */
+const HEADERS: Record<Field, string[]> = {
+  name: ["name", "customer", "customer name", "party", "party name", "grahak", "naam", "नाम", "ग्राहक", "नाव", "নাম", "খদ্দের", "গ্রাহক", "ନାମ", "ଗ୍ରାହକ"],
+  amount: [
+    "amount", "amt", "rupees", "rs", "₹", "inr", "due", "dues", "credit", "balance", "bal", "total", "outstanding", "pending", "baki", "baaki",
+    "udhaar", "udhar", "bakaya", "बाकी", "रकम", "उधार", "बकाया", "थकबाकी", "उधारी", "टाका", "টাকা", "বাকি", "বকেয়া", "ধার", "ବାକି", "ଉଧାର", "ଟଙ୍କା",
+  ],
+  paid: ["paid", "jama", "received", "payment", "payments", "जमा", "भुगतान", "जमा रक्कम", "জমা", "ଜମା"],
+  items: ["item", "items", "detail", "details", "goods", "product", "products", "particulars", "description", "saman", "सामान", "माल", "विवरण", "वस्तू", "জিনিস", "মাল", "ଜିନିଷ", "ବିବରଣୀ"],
+  date: ["date", "day", "dt", "tarikh", "तारीख", "दिनांक", "তারিখ", "ତାରିଖ"],
+  phone: ["phone", "mobile", "mob", "number", "phone number", "mobile number", "contact", "फ़ोन", "फोन", "मोबाइल", "ফোন", "মোবাইল", "ଫୋନ", "ମୋବାଇଲ"],
 };
 
-const DEFAULT_ORDER: Exclude<Field, "nameNative">[] = ["name", "amount", "items", "date", "phone"];
+const DEFAULT_ORDER: Field[] = ["name", "amount", "items", "date", "phone"];
+
+const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{M}\p{N}₹]+/gu, " ").trim();
+
+/** The field a header names: the whole header, or one of its words ("Balance (Rs)" is amount). */
+function fieldOf(header: string): Field | undefined {
+  const h = words(header);
+  if (!h) return undefined;
+  const fields = Object.keys(HEADERS) as Field[];
+  return fields.find((f) => HEADERS[f].includes(h)) ?? fields.find((f) => HEADERS[f].some((name) => ` ${h} `.includes(` ${name} `)));
+}
 
 /** Parses CSV text: quoted fields, commas and new lines inside quotes, and "" for a quote. */
 export function parseCsv(text: string): string[][] {
@@ -53,18 +70,20 @@ export function parseCsv(text: string): string[][] {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** A cell as a YYYY-MM-DD date: Excel dates, 2026-10-28, 28/10/2026, 28-10-26 or 28/10 (this year). */
-export function toDate(cell: unknown, today: string): string | undefined {
+/**
+ * A cell as a YYYY-MM-DD date: Excel dates, 2026-10-28, or 28/10/2026, 28-10-26 and 28/10 (this
+ * year) read in `order` (day first unless the sheet writes the month first).
+ */
+export function toDate(cell: unknown, today: string, order: KhataColumns["dateOrder"] = "dmy"): string | undefined {
   if (cell instanceof Date && !Number.isNaN(cell.getTime())) return `${cell.getFullYear()}-${pad(cell.getMonth() + 1)}-${pad(cell.getDate())}`;
   const s = String(cell ?? "").trim();
   if (!s) return undefined;
-  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
+  let m = /^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})/.exec(s);
   if (m) return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
   m = /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?$/.exec(s);
   if (m) {
     const year = m[3] ? (m[3].length === 2 ? `20${m[3]}` : m[3]) : today.slice(0, 4);
-    const day = +m[1];
-    const month = +m[2];
+    const [day, month] = order === "mdy" ? [+m[2], +m[1]] : [+m[1], +m[2]];
     if (month >= 1 && month <= 12 && day >= 1 && day <= 31) return `${year}-${pad(month)}-${pad(day)}`;
   }
   return undefined;
@@ -77,28 +96,61 @@ const toAmount = (cell: unknown) => {
 
 export type FileResult = { lines: KhataLineInput[]; skipped: number };
 
-/** Rows (first may be headers) as khata lines. Rows without a name or a positive amount are skipped. */
-export function rowsToLines(rows: unknown[][], today: string): FileResult {
+/**
+ * Rows as khata lines, using `columns` when a model worked them out, else the header names. Rows
+ * without a name or a positive amount (after subtracting a paid column) are skipped.
+ */
+export function rowsToLines(rows: unknown[][], today: string, columns?: KhataColumns): FileResult {
   if (rows.length === 0) return { lines: [], skipped: 0 };
-  const header = rows[0].map((c) => String(c ?? "").trim());
-  const columns = new Map<Field, number>();
-  header.forEach((h, i) => {
-    for (const [field, re] of Object.entries(HEADERS) as [Field, RegExp][]) if (re.test(h) && !columns.has(field)) columns.set(field, i);
-  });
-  const hasHeader = columns.has("name") && columns.has("amount");
-  if (!hasHeader) DEFAULT_ORDER.forEach((f, i) => columns.set(f, i));
+  const map = columns ?? columnsFromHeaders(rows[0]);
   const lines: KhataLineInput[] = [];
   let skipped = 0;
-  for (const row of hasHeader ? rows.slice(1) : rows) {
-    const cell = (f: Field) => (columns.has(f) ? row[columns.get(f)!] : undefined);
-    const name = String(cell("name") ?? "").trim();
-    const amount = toAmount(cell("amount"));
-    if (!name || !amount) {
+  for (const row of rows.slice(map.headerRows)) {
+    const cell = (i: number) => (i >= 0 ? row[i] : undefined);
+    const name = String(cell(map.name) ?? "").trim();
+    const owed = toAmount(cell(map.amount)) ?? 0;
+    const amount = owed - (map.paid >= 0 ? (toAmount(cell(map.paid)) ?? 0) : 0);
+    if (!name || amount <= 0) {
       skipped++;
       continue;
     }
-    const phone = String(cell("phone") ?? "").trim();
-    lines.push({ name, amount, items: String(cell("items") ?? "").trim(), date: toDate(cell("date"), today) ?? today, phone: phone || undefined });
+    const phone = String(cell(map.phone) ?? "").trim();
+    const nameNative = String(cell(map.nameNative) ?? "").trim();
+    lines.push({
+      name,
+      ...(nameNative ? { nameNative } : {}),
+      amount,
+      items: String(cell(map.items) ?? "").trim(),
+      date: toDate(cell(map.date), today, map.dateOrder) ?? today,
+      phone: phone || undefined,
+    });
   }
   return { lines, skipped };
 }
+
+/** Columns by their header names; without a name and an amount header, the default order and no header row. */
+export function columnsFromHeaders(header: unknown[]): KhataColumns {
+  const found = new Map<Field, number>();
+  header.forEach((h, i) => {
+    const field = fieldOf(String(h ?? ""));
+    if (field && !found.has(field)) found.set(field, i);
+  });
+  if (!found.has("name") || !found.has("amount")) {
+    found.clear();
+    DEFAULT_ORDER.forEach((f, i) => found.set(f, i));
+    return { headerRows: 0, nameNative: -1, paid: -1, dateOrder: "dmy", ...toColumns(found) };
+  }
+  return { headerRows: 1, nameNative: -1, dateOrder: "dmy", ...toColumns(found), paid: found.get("paid") ?? -1 };
+}
+
+const toColumns = (found: Map<Field, number>) => ({
+  name: found.get("name") ?? -1,
+  amount: found.get("amount") ?? -1,
+  items: found.get("items") ?? -1,
+  date: found.get("date") ?? -1,
+  phone: found.get("phone") ?? -1,
+});
+
+/** Cells as short text, to show a model the first rows. */
+export const sampleRows = (rows: unknown[][]): string[][] =>
+  rows.slice(0, 8).map((r) => r.slice(0, 12).map((c) => (c instanceof Date ? c.toISOString().slice(0, 10) : String(c ?? "").trim().slice(0, 40))));

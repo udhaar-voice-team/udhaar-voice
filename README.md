@@ -77,7 +77,7 @@ bolna/
 ## Plans
 
 - **Plans** (`PLANS` in `lib/domain/rules.ts`, `0008_plans.sql`, the Plans page): the khata is free, with 2 photo reads a day. Asha (₹199 a month) adds 25 reminder calls a month and a Saturday summary call; Asha Plus (₹399) adds 60 calls and a daily summary call; both read up to 30 photos a day. Call packs add 10 calls on any plan, used once the month's calls run out. Payments aren't live: during the pilot, plans switch at no charge. New shops start on the free plan.
-- **WhatsApp first:** sending a WhatsApp reminder from a customer's page is noted, and Asha may call 3 days later if no payment came in. A missed promise or a request to be called back skips this step. The reminder carries the shop's UPI ID, a link to a pay page (`/pay`) whose button opens the customer's UPI app, and the QR code as a picture; no amount is fixed, so customers can pay part. Dues under ₹300 get WhatsApp only, nobody is called more than twice a month, nobody is reminded before a promised date, and when calls run short the oldest and largest dues are called first.
+- **WhatsApp first:** sending a WhatsApp reminder from a customer's page is noted. Asha can call any time, but until a reminder has had 3 days with no payment, the customer's page suggests sending one first, as it's free. The reminder carries the shop's UPI ID, a link to a pay page (`/pay`) whose button opens the customer's UPI app, and the QR code as a picture; no amount is fixed, so customers can pay part. Dues under ₹300 get WhatsApp only, nobody is called more than twice a month, nobody is reminded before a promised date, and when calls run short the oldest and largest dues are called first.
 
 ## Corrections and accounts
 
@@ -94,7 +94,7 @@ bolna/
 
 ## Reading and understanding
 
-- **Typed entries and spreadsheets** (`lib/khata-file.ts`): CSV and Excel files are read in the browser; columns are found by their header in English, Hindi or Bengali, or taken in the order name, amount, items, date, phone. They go through the same review as a photo.
+- **Typed entries and spreadsheets** (`lib/khata-file.ts`): CSV and Excel files are read in the browser. Only the first few rows go to a model (`readKhataColumns`), which says which column holds the name, amount, a separate paid column, items, date and phone, whatever the shopkeeper named them, and whether dates are written day or month first; every row is then converted in the browser. Without a model, many common column names in English and Indian languages are recognised, or the order name, amount, items, date, phone is taken. They go through the same review as a photo, without the photo-reading screen.
 - **Khata photos** (`lib/server/ai.ts`, `khata.ts`): the photo is shrunk in the browser, stored in `khata-photos/{shop}/{scan}.jpg`, and read by Gemini (or Muse Spark) against a JSON schema. Rows are then matched to customers and saved entries exactly like the sample page.
 - **Ask** (`lib/server/ask.ts`): Gemini gets tools over the shop's data (summary, a customer, promises by range, top dues, disputes, missed promises, collections, product requests, scheduling a call) and answers in the question's language. The keyword assistant answers when Gemini isn't set up or fails.
 - **Voice questions:** Gemini transcribes the recording in its own script before it is asked.
