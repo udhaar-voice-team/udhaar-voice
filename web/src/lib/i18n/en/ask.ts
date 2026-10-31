@@ -13,14 +13,15 @@ export const ask = {
   voiceDenied: "The microphone is blocked. Allow it in your browser's site settings.",
   voiceUnsupported: "This browser can't record audio. Type your question instead.",
   voiceFailed: "Couldn't hear that. Try again.",
+  /** Asked about the shop's own customers, so the names always exist. */
+  suggestOwes: (name: string) => `How much does ${name} owe?`,
+  suggestCall: (name: string) => `Call ${name} tomorrow`,
   suggestions: [
     "Who will pay this week?",
-    "How much does Ramesh owe?",
     "Any open disputes?",
     "Who broke a promise?",
     "What did customers ask for?",
     "How much came in today?",
-    "Call Bapi tomorrow",
   ],
   you: "You",
   assistant: "Asha",

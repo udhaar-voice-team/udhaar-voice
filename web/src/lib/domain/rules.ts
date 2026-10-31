@@ -198,15 +198,28 @@ export function confidenceLabel(c: number): "High" | "Medium" | "Low" {
   return "Low";
 }
 
-/** UPI deep link that any UPI app understands. */
-/** No fixed note (`tn`), so customers can write their own when they pay. */
-export function upiLink(input: { upiId: string; payeeName: string; amount: number }): string {
-  const params = new URLSearchParams({ pa: input.upiId, pn: input.payeeName, am: String(input.amount), cu: "INR" });
+/**
+ * UPI deep link that any UPI app understands. No amount (`am`), because UPI apps don't let the
+ * customer change a fixed one and many pay part of their dues; no fixed note (`tn`) either, so they
+ * can write their own.
+ */
+export function upiLink(input: { upiId: string; payeeName: string }): string {
+  const params = new URLSearchParams({ pa: input.upiId, pn: input.payeeName, cu: "INR" });
   return `upi://pay?${params.toString()}`;
+}
+
+/**
+ * The public page a WhatsApp reminder links to. WhatsApp doesn't open upi:// links, but it opens
+ * https ones, and the page's button opens the customer's UPI app. `due` is only shown on the page.
+ */
+export function payPageLink(origin: string, input: { upiId: string; payeeName: string; due: number; language: Language }): string {
+  const params = new URLSearchParams({ pa: input.upiId, pn: input.payeeName, due: String(input.due), l: input.language });
+  return `${origin}/pay?${params.toString()}`;
 }
 
 /** WhatsApp share link with a prefilled message. Works without any API. */
 export function whatsappShareLink(e164: string, message: string): string {
+  // Without a number, WhatsApp asks which chat to send it to.
   return `https://wa.me/${e164.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
 }
 

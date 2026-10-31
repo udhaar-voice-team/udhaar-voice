@@ -168,7 +168,7 @@ export const mr: Dictionary = {
       memoryHint: "कॉलमध्ये पाठवले जाते, जेणेकरून एजंट म्हणू शकेल “मागील आठवड्यात तुम्ही शुक्रवारी सांगितले होते”. मागील कॉलवरून लिहिले गेले.",
       actions: {
         callNow: "आत्ता कॉल करा",
-        shareUpi: "UPI लिंक पाठवा",
+        shareUpi: "WhatsApp वर पाठवा",
         showQr: "UPI QR",
         recordPayment: "पैसे मिळाले",
         addEntry: "खात्यात लिहा",
@@ -211,8 +211,11 @@ export const mr: Dictionary = {
       entry: "घेतले",
       payment: "दिले",
       fromPhoto: "फोटोमधून",
-      upiMessage: (shop: string, amount: string, link: string) =>
-        `नमस्ते! ${shop} कडून आठवण करून देत आहोत: खात्यात ${amount} बाकी आहे. तुम्ही इथे UPI द्वारे भरू शकता: ${link}`,
+      reminderMessage: (shop: string, amount: string) => `नमस्ते! ${shop} कडून आठवण करून देत आहोत: खात्यात ${amount} बाकी आहे.`,
+      payBy: (upiId: string) => `तुम्ही UPI द्वारे ${upiId} वर पूर्ण किंवा थोडी रक्कम भरू शकता.`,
+      qrAttached: "QR कोडही सोबत आहे: तो सेव्ह करा, मग कोणत्याही UPI ॲपमध्ये गॅलरीतून स्कॅन करा.",
+      payLink: (url: string) => `कोणत्याही UPI ॲपने इथे भरा: ${url}`,
+      qrCopied: "QR कोड कॉपी झाला. तो WhatsApp चॅटमध्ये पेस्ट करा (Ctrl+V).",
       paymentDialog: {
         title: "पैसे मिळाल्याची नोंद",
         amount: "रक्कम (₹)",
@@ -463,14 +466,15 @@ export const mr: Dictionary = {
     voiceDenied: "माइक बंद आहे. ब्राउझरच्या साईट सेटिंग्जमध्ये माइक सुरू करा.",
     voiceUnsupported: "हा ब्राउझर रेकॉर्ड करू शकत नाही. प्रश्न लिहून विचारा.",
     voiceFailed: "ऐकू आले नाही. पुन्हा प्रयत्न करा.",
+    /** Asked about the shop's own customers, so the names always exist. */
+    suggestOwes: (name: string) => `${name} चे किती बाकी आहे?`,
+    suggestCall: (name: string) => `उद्या ${name} ला कॉल करा`,
     suggestions: [
       "या आठवड्यात कोण देणार?",
-      "रमेशचे किती बाकी आहे?",
       "काही तक्रार आहे का?",
       "कोणी वचन मोडले?",
       "ग्राहकांनी काय मागितले?",
       "आज किती पैसे आले?",
-      "उद्या राहुलला कॉल करा",
     ],
     you: "तुम्ही",
     assistant: "Asha",
@@ -677,5 +681,17 @@ export const mr: Dictionary = {
     },
     switched: (name: string) => `आता तुम्ही ${name} प्लॅनवर आहात.`,
     packAdded: (n: number) => `${n} कॉल जोडले.`,
+  },
+  pay: {
+    title: (shop: string) => `${shop} ला पैसे भरा`,
+    due: (amount: string) => `बाकी: ${amount}`,
+    part: "पूर्ण किंवा थोडी रक्कम भरा: रक्कम तुमच्या UPI ॲपमध्ये लिहा.",
+    button: "UPI ॲपने भरा",
+    scan: "किंवा हा QR कोड कोणत्याही UPI ॲपने स्कॅन करा. याच फोनवर असाल तर तो डाउनलोड करा आणि UPI ॲपमध्ये गॅलरीतून निवडा.",
+    download: "QR कोड डाउनलोड करा",
+    upiId: "UPI ID",
+    copy: "कॉपी करा",
+    copied: "कॉपी झाले",
+    invalid: "ही पेमेंट लिंक अपूर्ण आहे. दुकानाला ती पुन्हा पाठवायला सांगा.",
   },
 };

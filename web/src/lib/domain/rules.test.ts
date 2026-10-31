@@ -18,11 +18,13 @@ import {
   matchSavedEntry,
   normalizeIndianMobile,
   toDateKey,
+  payPageLink,
   upiLink,
   byCallPriority,
   callsLeft,
   packCallsUsed,
   summaryCallToday,
+  whatsappShareLink,
   whatsappStep,
 } from "./rules";
 import type { Dispute, Note, PaymentPromise } from "./types";
@@ -136,12 +138,22 @@ describe("normalizeIndianMobile", () => {
   });
 });
 
+describe("payPageLink", () => {
+  it("links to the pay page with the shop's UPI ID, name, the amount due and the customer's language", () => {
+    const link = new URL(payPageLink("https://udhaar-voice.vercel.app", { upiId: "shop@upi", payeeName: "Maa Tara", due: 1240, language: "bn" }));
+    expect(link.pathname).toBe("/pay");
+    expect(Object.fromEntries(link.searchParams)).toEqual({ pa: "shop@upi", pn: "Maa Tara", due: "1240", l: "bn" });
+  });
+});
+
 describe("upiLink", () => {
   it("builds a standard upi:// link", () => {
-    const link = upiLink({ upiId: "shop@upi", payeeName: "Maa Tara Stores", amount: 350 });
+    const link = upiLink({ upiId: "shop@upi", payeeName: "Maa Tara Stores" });
     expect(link.startsWith("upi://pay?")).toBe(true);
     const params = new URLSearchParams(link.split("?")[1]);
-    expect(params.get("am")).toBe("350");
+    expect(params.get("pa")).toBe("shop@upi");
+    // No fixed amount, so the customer can pay part of their dues.
+    expect(params.has("am")).toBe(false);
     // No fixed note, so the customer can write their own.
     expect(params.has("tn")).toBe(false);
   });
@@ -307,5 +319,12 @@ describe("plans", () => {
       { id: "c", oldestDue: "2026-10-10", balance: 900 },
     ];
     expect([...list].sort(byCallPriority).map((x) => x.id)).toEqual(["b", "c", "a"]);
+  });
+});
+
+describe("WhatsApp links", () => {
+  it("opens the customer's chat, or asks for a chat when there's no number", () => {
+    expect(whatsappShareLink("+919000000101", "Hi ₹5")).toBe("https://wa.me/919000000101?text=Hi%20%E2%82%B95");
+    expect(whatsappShareLink("", "Hi")).toBe("https://wa.me/?text=Hi");
   });
 });

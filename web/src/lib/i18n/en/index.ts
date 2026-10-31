@@ -8,6 +8,7 @@ import { dashboard } from "./dashboard";
 import { graph } from "./graph";
 import { khata } from "./khata";
 import { nav } from "./nav";
+import { pay } from "./pay";
 import { plans } from "./plans";
 import { profile } from "./profile";
 import { report } from "./report";
@@ -28,4 +29,5 @@ export const en = {
   profile,
   settings,
   plans,
+  pay,
 };

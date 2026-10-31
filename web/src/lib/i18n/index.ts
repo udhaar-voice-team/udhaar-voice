@@ -77,4 +77,7 @@ export function useT(): Dictionary {
   return DICTIONARIES[useAppLanguage()];
 }
 
+/** Text for someone other than the shopkeeper, such as a customer's WhatsApp message in their own language. */
+export const dictionaryFor = (language: Language): Dictionary => DICTIONARIES[language];
+
 export { en };

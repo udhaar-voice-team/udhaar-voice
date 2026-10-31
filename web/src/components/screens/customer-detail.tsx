@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import QRCode from "qrcode";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   CallStatusPill,
@@ -48,9 +49,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { api } from "@/lib/api";
 import type { CustomerDetail } from "@/lib/api/contract";
 import { attempt, useApiMutation, useCustomer, useReminderCandidates, useShop } from "@/lib/api/hooks";
-import { formatINR, isPromiseBroken, normalizeIndianMobile, toDateKey, upiLink, whatsappShareLink } from "@/lib/domain/rules";
+import { formatINR, isPromiseBroken, normalizeIndianMobile, payPageLink, toDateKey, upiLink, whatsappShareLink } from "@/lib/domain/rules";
 import type { PaymentPromise } from "@/lib/domain/types";
-import { useT } from "@/lib/i18n";
+import { dictionaryFor, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Initial } from "./customers";
 
@@ -241,8 +242,49 @@ function CustomerActions({ d }: { d: CustomerDetail }) {
   // Asha may call a few days after a WhatsApp reminder, so sending one is noted.
   const logWhatsapp = useApiMutation(api.logWhatsappReminder, { quiet: true });
   const shopName = shop.data?.name ?? "";
-  const upi = shop.data ? upiLink({ upiId: shop.data.upiId, payeeName: shopName, amount: d.balance }) : "";
-  const whatsapp = d.customer.phone ? whatsappShareLink(d.customer.phone, c.upiMessage(shopName, formatINR(d.balance), upi)) : undefined;
+  const upiId = shop.data?.upiId ?? "";
+  const upi = upiLink({ upiId, payeeName: shopName });
+  // The message goes in the customer's language. WhatsApp doesn't open upi:// links, so it carries
+  // the UPI ID and a link to the pay page, whose button opens the customer's UPI app.
+  const words = dictionaryFor(d.customer.language).customers.detail;
+  const qrFile = useQrFile(upiId ? upi : "");
+
+  /**
+   * A WhatsApp link can only carry text, so the QR code goes as a picture another way: on a phone
+   * the share sheet sends it with the message (the shopkeeper picks WhatsApp, then the customer);
+   * elsewhere it is copied, and WhatsApp opens on the customer's chat for it to be pasted.
+   */
+  const sendWhatsapp = async () => {
+    logWhatsapp.mutate(d.customer.id);
+    const message = (withQr: boolean) =>
+      [
+        words.reminderMessage(shopName, formatINR(d.balance)),
+        upiId && words.payBy(upiId),
+        upiId && words.payLink(payPageLink(window.location.origin, { upiId, payeeName: shopName, due: d.balance, language: d.customer.language })),
+        withQr && words.qrAttached,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+    if (qrFile && window.matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [qrFile] })) {
+      try {
+        await navigator.share({ files: [qrFile], text: message(true) });
+        return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+    }
+    let copied = false;
+    if (qrFile && typeof ClipboardItem !== "undefined") {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": qrFile })]);
+        copied = true;
+      } catch {
+        // No clipboard access: the pay page has the QR code too.
+      }
+    }
+    window.open(whatsappShareLink(d.customer.phone, message(copied)), "_blank", "noopener,noreferrer");
+    if (copied) toast.success(c.qrCopied);
+  };
 
   return (
     <div className="flex flex-col gap-2 md:items-end">
@@ -279,11 +321,9 @@ function CustomerActions({ d }: { d: CustomerDetail }) {
           {blocked ? <TooltipContent>{blocked}</TooltipContent> : null}
         </Tooltip>
       </div>
-      {whatsapp && d.balance > 0 ? (
-        <Button asChild size="lg" variant="outline">
-          <a href={whatsapp} target="_blank" rel="noopener noreferrer" onClick={() => logWhatsapp.mutate(d.customer.id)}>
-            <MessageCircle /> {c.actions.shareUpi}
-          </a>
+      {d.balance > 0 ? (
+        <Button size="lg" variant="outline" onClick={() => void sendWhatsapp()}>
+          <MessageCircle /> {c.actions.shareUpi}
         </Button>
       ) : null}
       {shop.data?.upiId && d.balance > 0 ? (
@@ -725,4 +765,24 @@ function RemoveDialog({ customer, onClose }: { customer: CustomerDetail["custome
       </DialogContent>
     </Dialog>
   );
+}
+
+/** The UPI QR code as a PNG file, made ahead so sharing starts straight from the tap. */
+function useQrFile(link: string): File | null {
+  const [file, setFile] = useState<{ link: string; file: File } | null>(null);
+  useEffect(() => {
+    if (!link) return;
+    let cancelled = false;
+    QRCode.toDataURL(link, { width: 512, margin: 2, errorCorrectionLevel: "M" })
+      .then((url) => fetch(url))
+      .then((r) => r.blob())
+      .then((blob) => {
+        if (!cancelled) setFile({ link, file: new File([blob], "upi-qr.png", { type: "image/png" }) });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [link]);
+  return file?.link === link ? file.file : null;
 }

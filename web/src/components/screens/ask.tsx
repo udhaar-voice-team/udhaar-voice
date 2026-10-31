@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import type { AskAnswer } from "@/lib/api/contract";
-import { attempt, useApiMutation } from "@/lib/api/hooks";
+import { attempt, useApiMutation, useCustomers, useReminderCandidates } from "@/lib/api/hooks";
 import { untilAnswered } from "@/lib/api/steps";
 import { toWav } from "@/lib/audio";
 import { useLeaveWarning } from "@/hooks/use-leave-warning";
@@ -28,6 +28,17 @@ const scriptLang = (s: string) => (/[ঀ-৿]/.test(s) ? "bn" : /[ଁ-୷]/.test
 
 export function AskScreen() {
   const t = useT().ask;
+  const customers = useCustomers();
+  const candidates = useReminderCandidates();
+  // Examples with names come from this shop: who owes the most, and someone Asha can call now.
+  const owesMost = [...(customers.data ?? [])].filter((c) => c.balance > 0).sort((a, b) => b.balance - a.balance)[0];
+  const callable = (candidates.data ?? []).find((c) => c.eligible);
+  const suggestions = [
+    ...t.suggestions.slice(0, 1),
+    ...(owesMost ? [t.suggestOwes(owesMost.customer.name)] : []),
+    ...t.suggestions.slice(1),
+    ...(callable ? [t.suggestCall(callable.customer.name)] : []),
+  ];
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   // Whether a second model has taken over the current question or recording.
@@ -121,7 +132,7 @@ export function AskScreen() {
 
           <div className="space-y-3 border-t bg-muted/30 px-4 py-4 sm:px-6">
             <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-              {t.suggestions.map((s) => (
+              {suggestions.map((s) => (
                 <button
                   key={s}
                   type="button"

@@ -28,7 +28,7 @@ export const customers = {
     memoryHint: "Passed into the call so the agent can say “last week you said Friday”. Written from past calls.",
     actions: {
       callNow: "Call now",
-      shareUpi: "Share UPI link",
+      shareUpi: "Send on WhatsApp",
       showQr: "UPI QR",
       recordPayment: "Record payment",
       addEntry: "Add entry",
@@ -71,8 +71,11 @@ export const customers = {
     entry: "Bought",
     payment: "Paid",
     fromPhoto: "from photo",
-    upiMessage: (shop: string, amount: string, link: string) =>
-      `Namaskar! This is a reminder from ${shop}: ${amount} is pending in the khata. You can pay by UPI here: ${link}`,
+    reminderMessage: (shop: string, amount: string) => `Namaskar! This is a reminder from ${shop}: ${amount} is pending in the khata.`,
+    payBy: (upiId: string) => `You can pay by UPI to ${upiId}, all of it or part of it.`,
+    qrAttached: "The QR code is attached too: save it, then scan it from the gallery in any UPI app.",
+    payLink: (url: string) => `Pay with any UPI app here: ${url}`,
+    qrCopied: "QR code copied. Paste it into the WhatsApp chat (Ctrl+V).",
     paymentDialog: {
       title: "Record a payment",
       amount: "Amount (₹)",
