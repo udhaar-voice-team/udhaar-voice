@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { format } from "date-fns";
-import { normalizeIndianMobile, toDateKey } from "@/lib/domain/rules";
-import { Shop as ShopSchema, type Call, type Language, type LedgerEntry, type Payment } from "@/lib/domain/types";
+import { CALL_PACK, normalizeIndianMobile, PLANS, toDateKey } from "@/lib/domain/rules";
+import { PlanId as PlanIdSchema, Shop as ShopSchema, type Call, type Language, type LedgerEntry, type Payment } from "@/lib/domain/types";
 import type { KhataImportSummary, Session, UdhaarApi } from "@/lib/api/contract";
 import { buildReminderScript } from "@/lib/demo/scripts";
 import { ask } from "./ask";
@@ -13,7 +13,7 @@ import { env } from "./env";
 import { fromInputLines, fromReadLines, photoPath, readSamplePage, toRows } from "./khata";
 import { step } from "./ai";
 import { aiConfigured, PROVIDERS } from "./providers";
-import { batchSummaries, batchSummary, callDetail, callItems, candidates, customerDetail, dailyReport, dashboard, graph, summaries } from "./queries";
+import { batchSummaries, batchSummary, callDetail, callItems, candidates, customerDetail, dailyReport, dashboard, graph, planUsage, summaries } from "./queries";
 import { runDispatcher } from "./dispatcher";
 import { batchCallsToCancel, callsToCancel, planBatchMove, planCallMove, planSchedule, type MovePlan } from "./scheduling";
 import { clearAccount, limited, recordFailure, signInKeys, signUpKeys, TOO_MANY } from "./limits";
@@ -383,6 +383,7 @@ export const serverApi: ServerApi = {
         p_detail: plan.detail ?? null,
       }),
     ) as string;
+    if (plan.packCalls > 0) maybe(await ctx.sb.rpc("use_extra_calls", { p_count: plan.packCalls }));
     if (plan.at.getTime() <= ctx.now.getTime() + 60_000) await dialNow();
     const batch = (await shopData(ctx)).batches.find((b) => b.id === batchId);
     return { batch, skipped: plan.skipped };
@@ -435,6 +436,16 @@ export const serverApi: ServerApi = {
     let mime: string;
     if (photo instanceof Blob && photo.size > 0) {
       if (photo.size > MAX_PHOTO_BYTES) throw new Error("That photo is too large. Try again with a smaller one.");
+      // A new page counts against the plan's photos a day; reading the same page again doesn't.
+      const perDay = PLANS[db.shop.plan].photoReadsPerDay;
+      if (db.usage.photoReadsToday >= perDay) {
+        throw new Error(
+          db.shop.plan === "free"
+            ? `The free plan reads ${perDay} photos a day. Type the lines in, or see Plans for more.`
+            : `That's ${perDay} photos today, the most for one day. Try again tomorrow, or type the lines in.`,
+        );
+      }
+      maybe(await ctx.sb.from("usage_events").insert({ shop_id: db.shop.id, kind: "photo_read" }));
       bytes = new Uint8Array(await photo.arrayBuffer());
       mime = photo.type || "image/jpeg";
       // Kept in the shop's private folder, as evidence if an entry is disputed later, and for the next model to read.
@@ -540,6 +551,7 @@ export const serverApi: ServerApi = {
 
   sendReportCall: async ({ sb, now }) => {
     const { shop } = await requireSession(sb);
+    if (PLANS[shop.plan].summaryCalls === "none") throw new Error("Summary calls come with the Asha plan. See Plans.");
     const row = check(
       await sb
         .from("calls")
@@ -553,6 +565,27 @@ export const serverApi: ServerApi = {
   },
 
   getGraph: async (ctx) => graph(await shopData(ctx), ctx.now),
+
+  getPlan: async (ctx) => planUsage(await shopData(ctx), ctx.now),
+
+  setPlan: async (ctx, plan) => {
+    const { shop } = await requireSession(ctx.sb);
+    if (!PlanIdSchema.safeParse(plan).success) throw new Error("Choose a plan.");
+    maybe(await ctx.sb.from("shops").update({ plan }).eq("id", shop.id));
+    return planUsage(await shopData(ctx), ctx.now);
+  },
+
+  addCallPack: async (ctx) => {
+    const { shop } = await requireSession(ctx.sb);
+    maybe(await ctx.sb.from("shops").update({ extra_calls: shop.extraCalls + CALL_PACK.calls }).eq("id", shop.id));
+    return planUsage(await shopData(ctx), ctx.now);
+  },
+
+  logWhatsappReminder: async (ctx, customerId) => {
+    const db = await shopData(ctx);
+    if (!db.customers.some((c) => c.id === customerId)) throw new Error("Customer not found");
+    maybe(await ctx.sb.from("usage_events").insert({ shop_id: db.shop.id, kind: "whatsapp_reminder", customer_id: customerId }));
+  },
 
   startDemoCall: async ({ now }, { phone, language, name }) => {
     const number = normalizeIndianMobile(phone);

@@ -10,6 +10,7 @@ import { ScheduleDialog } from "@/components/app/schedule-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -123,7 +124,7 @@ export function NewBatchForm({ onScheduled }: { onScheduled: () => void }) {
               <Label htmlFor="batch-date" className="text-xs text-muted-foreground">
                 {t.date}
               </Label>
-              <Input id="batch-date" type="date" value={date} min={toDateKey(new Date())} onChange={(e) => setDate(e.target.value)} className="h-10 w-44" />
+              <DateInput id="batch-date" value={date} min={toDateKey(new Date())} onChange={(e) => setDate(e.target.value)} className="h-10 w-44" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="batch-time" className="text-xs text-muted-foreground">

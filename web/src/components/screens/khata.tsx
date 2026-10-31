@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
@@ -378,7 +379,7 @@ function Review({
                     />
                   </Field>
                   <Field label={t.columns.date} confidence={r.date.confidence}>
-                    <Input id={`date-${r.id}`} type="date" value={r.date.value} onChange={(e) => update(r.id, { date: { value: e.target.value, confidence: 1 } })} />
+                    <DateInput id={`date-${r.id}`} value={r.date.value} onChange={(e) => update(r.id, { date: { value: e.target.value, confidence: 1 } })} />
                   </Field>
                   <Field label={t.columns.items} confidence={r.items.confidence} className="col-span-2 sm:col-span-3">
                     <Input id={`items-${r.id}`} value={r.items.value} onChange={(e) => update(r.id, { items: { value: e.target.value, confidence: 1 } })} />

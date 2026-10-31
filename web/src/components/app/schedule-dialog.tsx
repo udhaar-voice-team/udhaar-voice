@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { useT } from "@/lib/i18n";
 
@@ -64,9 +65,8 @@ export function ScheduleDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="schedule-date">{s.date}</Label>
-              <Input
+              <DateInput
                 id="schedule-date"
-                type="date"
                 min={minDate}
                 max={maxDate}
                 value={dateValue}

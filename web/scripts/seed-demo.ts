@@ -56,7 +56,7 @@ async function main() {
   const { shop } = seed;
 
   await run("profile", admin.from("profiles").insert({ id: userId, name: shop.ownerName, phone: DEMO_PHONE_E164 }));
-  await run("shop", admin.from("shops").insert({ id: shopId, owner_id: userId, name: shop.name, upi_id: shop.upiId }));
+  await run("shop", admin.from("shops").insert({ id: shopId, owner_id: userId, name: shop.name, upi_id: shop.upiId, plan: shop.plan }));
   await run(
     "settings",
     admin.from("shop_settings").insert({
@@ -87,6 +87,11 @@ async function main() {
         created_at: c.createdAt,
       })),
     ),
+  );
+
+  await run(
+    "WhatsApp reminders",
+    admin.from("usage_events").insert(seed.usage.whatsapp.map((w) => ({ shop_id: shopId, kind: "whatsapp_reminder", customer_id: id(w.customerId), at: w.at }))),
   );
 
   await run(

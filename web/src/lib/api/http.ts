@@ -69,5 +69,9 @@ export const httpApi: UdhaarApi = {
   getDailyReport: json("getDailyReport"),
   sendReportCall: json("sendReportCall"),
   getGraph: json("getGraph"),
+  getPlan: json("getPlan"),
+  setPlan: json("setPlan"),
+  addCallPack: json("addCallPack"),
+  logWhatsappReminder: json("logWhatsappReminder"),
   startDemoCall: json("startDemoCall"),
 };

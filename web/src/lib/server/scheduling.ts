@@ -1,9 +1,9 @@
 import { format } from "date-fns";
-import { canChangeBatchTime, isWithinCallingHours } from "@/lib/domain/rules";
+import { byCallPriority, callsLeft, canChangeBatchTime, isWithinCallingHours, packCallsUsed } from "@/lib/domain/rules";
 import type { Call, CallingHours, Customer, Language, ReminderBatch } from "@/lib/domain/types";
 import type { ScheduleInput } from "@/lib/api/contract";
 import type { ShopData } from "./data";
-import { candidates } from "./queries";
+import { callsUsedThisMonth, candidates, oldestDue } from "./queries";
 
 /**
  * Decides what scheduling, moving and cancelling calls should change. Pure: lib/server/api.ts
@@ -24,6 +24,8 @@ export type SchedulePlan =
       skipped: { customer: Customer; reason: string }[];
       /** Goes on each call's timeline. */
       detail?: string;
+      /** Calls taken from call packs, once this month's calls are used. */
+      packCalls: number;
     };
 
 export function planSchedule(db: ShopData, input: ScheduleInput, now: Date): SchedulePlan {
@@ -46,9 +48,20 @@ export function planSchedule(db: ShopData, input: ScheduleInput, now: Date): Sch
     const c = candidate.customer;
     calls.push({ customerId: c.id, toNumber: c.phone, language: input.language === "auto" ? c.language : input.language });
   }
-  if (calls.length === 0) return { kind: "nothing", skipped };
+  // The plan's calls left this month, plus call packs. When they're fewer than the customers
+  // chosen, the oldest and largest dues are called.
+  const used = callsUsedThisMonth(db, now);
+  const left = callsLeft(db.shop.plan, used, db.shop.extraCalls).total;
+  const ranked = calls
+    .map((call) => ({ call, oldestDue: oldestDue(db, call.customerId), balance: pool.get(call.customerId)!.balance }))
+    .sort(byCallPriority);
+  for (const { call } of ranked.slice(left)) {
+    skipped.push({ customer: pool.get(call.customerId)!.customer, reason: "No calls left this month. Add a call pack on the Plans page." });
+  }
+  const kept = ranked.slice(0, left).map((r) => r.call);
+  if (kept.length === 0) return { kind: "nothing", skipped };
   const detail = inside ? undefined : "Outside calling hours: bypassed for this demo";
-  return { kind: "batch", at, language: input.language, calls, skipped, detail };
+  return { kind: "batch", at, language: input.language, calls: kept, skipped, detail, packCalls: packCallsUsed(db.shop.plan, used, kept.length) };
 }
 
 export type MovePlan =

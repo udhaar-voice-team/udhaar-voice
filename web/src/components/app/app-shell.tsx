@@ -13,6 +13,7 @@ import {
   Store,
   Users,
   Ellipsis,
+  Gem,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -37,6 +38,7 @@ function useNavItems(): NavItem[] {
     { href: "/app/report", label: t.report, short: t.reportShort, icon: BookOpenCheck },
     { href: "/app/graph", label: t.graph, short: t.graphShort, icon: Network },
     { href: "/app/settings", label: t.settings, icon: Settings },
+    { href: "/app/plans", label: t.plans, icon: Gem },
   ];
 }
 

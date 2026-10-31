@@ -29,7 +29,7 @@ describe("promise status", () => {
 describe("shop", () => {
   it("joins the shop, its settings and its owner", () => {
     const shop = toShop(
-      { id: "s1", owner_id: "u1", name: "Maa Tara", upi_id: null },
+      { id: "s1", owner_id: "u1", name: "Maa Tara", upi_id: null, plan: "asha", extra_calls: 0 },
       {
         shop_id: "s1",
         calling_start: 8,

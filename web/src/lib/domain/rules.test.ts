@@ -19,6 +19,11 @@ import {
   normalizeIndianMobile,
   toDateKey,
   upiLink,
+  byCallPriority,
+  callsLeft,
+  packCallsUsed,
+  summaryCallToday,
+  whatsappStep,
 } from "./rules";
 import type { Dispute, Note, PaymentPromise } from "./types";
 
@@ -266,5 +271,41 @@ describe("spoken name", () => {
     expect(spokenName({ name: "Ramesh Yadav", nameNative: "रमेश यादव" }, "hi")).toBe("रमेश यादव");
     expect(spokenName(tapas, "en")).toBe("Tapas Biswas");
     expect(spokenName({ name: "Haru Kaka" }, "bn")).toBe("Haru Kaka");
+  });
+});
+
+describe("plans", () => {
+  const now = new Date("2026-10-21T11:00:00");
+
+  it("counts this month's calls first, then call packs", () => {
+    expect(callsLeft("asha", 20, 10)).toEqual({ monthly: 5, extra: 10, total: 15 });
+    expect(callsLeft("free", 0, 0).total).toBe(0);
+    expect(packCallsUsed("asha", 20, 8)).toBe(3);
+    expect(packCallsUsed("asha", 0, 8)).toBe(0);
+  });
+
+  it("makes the summary a call daily on Asha Plus, on Saturdays on Asha, never on the free plan", () => {
+    const saturday = new Date("2026-10-24T20:00:00");
+    expect(summaryCallToday("asha_plus", now)).toBe(true);
+    expect(summaryCallToday("asha", now)).toBe(false);
+    expect(summaryCallToday("asha", saturday)).toBe(true);
+    expect(summaryCallToday("free", saturday)).toBe(false);
+  });
+
+  it("lets Asha call three days after a WhatsApp reminder with no payment since", () => {
+    expect(whatsappStep([], undefined, now)).toEqual({ ready: false });
+    expect(whatsappStep([new Date("2026-10-17T10:00:00")], undefined, now)).toEqual({ ready: true });
+    expect(whatsappStep([new Date("2026-10-20T10:00:00")], undefined, now)).toMatchObject({ ready: false, callableFrom: new Date("2026-10-23T10:00:00") });
+    expect(whatsappStep([new Date("2026-10-17T10:00:00")], new Date("2026-10-18T10:00:00"), now)).toEqual({ ready: false });
+    expect(whatsappStep([new Date("2026-09-01T10:00:00")], undefined, now)).toEqual({ ready: false });
+  });
+
+  it("puts the oldest dues first, then the largest", () => {
+    const list = [
+      { id: "a", oldestDue: "2026-10-10", balance: 500 },
+      { id: "b", oldestDue: "2026-10-01", balance: 100 },
+      { id: "c", oldestDue: "2026-10-10", balance: 900 },
+    ];
+    expect([...list].sort(byCallPriority).map((x) => x.id)).toEqual(["b", "c", "a"]);
   });
 });

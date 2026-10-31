@@ -10,6 +10,7 @@ export const nav = {
   graph: "Knowledge graph",
   graphShort: "Graph",
   settings: "Settings",
+  plans: "Plans",
   more: "More",
   openMenu: "Open menu",
   website: "About Udhaar Voice",

@@ -146,6 +146,8 @@ export function createSeed(now: Date = new Date()): DemoShop {
       reportTime: "20:00",
       reportLanguage: "bn",
       demoBypassHours: false,
+      plan: "asha",
+      extraCalls: 0,
     },
     customers,
     entries,
@@ -155,6 +157,8 @@ export function createSeed(now: Date = new Date()): DemoShop {
     notes: [],
     calls: [],
     batches: [],
+    // A WhatsApp reminder went to everyone five days ago, so the demo shop's customers can be called.
+    usage: { whatsapp: customers.map((c) => ({ customerId: c.id, at: at(now, 5).toISOString() })), photoReadsToday: 0 },
   };
 
   for (const sc of PAST_CALLS) addPastCall(db, sc, now);

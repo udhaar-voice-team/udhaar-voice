@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { format } from "date-fns";
-import { dialOrder, formatINR, isWithinCallingHours, spokenName, toDateKey } from "@/lib/domain/rules";
+import { dialOrder, formatINR, isWithinCallingHours, spokenName, summaryCallToday, toDateKey } from "@/lib/domain/rules";
 import type { Language, Shop } from "@/lib/domain/types";
 import { BolnaError, getExecution, makeCall } from "./bolna/client";
 import { agentIds, bolnaConfigured } from "./bolna/config";
@@ -14,7 +14,7 @@ import { adminClient, check } from "./supabase";
 /**
  * Runs every minute (Supabase cron → /api/cron/dispatch), and right after a call is scheduled for now:
  * 1. checks calls on a line with Bolna, in case a webhook was missed;
- * 2. creates each shop's evening summary call at its chosen time;
+ * 2. creates each shop's evening summary call at its chosen time, on the days its plan includes;
  * 3. queues calls whose time has come;
  * 4. dials queued calls while lines are free, taking turns between shops.
  */
@@ -123,6 +123,8 @@ async function createEveningReports(admin: SupabaseClient, now: Date): Promise<n
   const shops = await loadShopsById(admin, due.filter((s) => !already.has(s.shop_id)).map((s) => s.shop_id));
   let created = 0;
   for (const shop of shops.values()) {
+    // Daily on Asha Plus, Saturdays on Asha, never on the free plan.
+    if (!summaryCallToday(shop.plan, now)) continue;
     const row = check(
       await admin
         .from("calls")

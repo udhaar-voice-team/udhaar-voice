@@ -39,11 +39,15 @@ export type ShopData = {
   imports: KhataImport[];
   /** Calls of every shop holding or waiting for a line. */
   lines: { lines: number; onLine: LineCall[]; waiting: LineCall[] };
+  /** WhatsApp reminders sent in the last month, and photos read today, for the plan's limits. */
+  usage: Usage;
 };
+
+export type Usage = { whatsapp: { customerId: string; at: string }[]; photoReadsToday: number };
 
 /* ---------------------------------------------------------------- rows as Postgres returns them */
 
-export type ShopRow = { id: string; owner_id: string; name: string; upi_id: string | null };
+export type ShopRow = { id: string; owner_id: string; name: string; upi_id: string | null; plan: Shop["plan"]; extra_calls: number };
 export type SettingsRow = {
   shop_id: string;
   calling_start: number;
@@ -144,6 +148,8 @@ export function toShop(shop: ShopRow, settings: SettingsRow, owner: ProfileRow):
     reportTime: settings.report_time.slice(0, 5),
     reportLanguage: settings.report_language,
     demoBypassHours: settings.demo_bypass_hours,
+    plan: shop.plan ?? "free",
+    extraCalls: shop.extra_calls ?? 0,
   };
 }
 
@@ -252,7 +258,7 @@ async function all<T>(query: (from: number, to: number) => PromiseLike<{ data: T
 export async function loadShop(sb: SupabaseClient, userId: string): Promise<{ shop: Shop; owner: ProfileRow } | null> {
   const [profile, shop] = await Promise.all([
     sb.from("profiles").select("id, name, phone, created_at").eq("id", userId).maybeSingle<ProfileRow>(),
-    sb.from("shops").select("id, owner_id, name, upi_id").eq("owner_id", userId).maybeSingle<ShopRow>(),
+    sb.from("shops").select("id, owner_id, name, upi_id, plan, extra_calls").eq("owner_id", userId).maybeSingle<ShopRow>(),
   ]);
   const owner = maybe(profile);
   const shopRow = maybe(shop);
@@ -264,7 +270,7 @@ export async function loadShop(sb: SupabaseClient, userId: string): Promise<{ sh
 /** Shops by ID, with settings and owner. For server jobs (admin client) that work across shops. */
 export async function loadShopsById(admin: SupabaseClient, ids: string[]): Promise<Map<string, Shop>> {
   if (ids.length === 0) return new Map();
-  const shops = check(await admin.from("shops").select("id, owner_id, name, upi_id").in("id", ids).returns<ShopRow[]>());
+  const shops = check(await admin.from("shops").select("id, owner_id, name, upi_id, plan, extra_calls").in("id", ids).returns<ShopRow[]>());
   const [settings, owners] = await Promise.all([
     admin.from("shop_settings").select("*").in("shop_id", ids).returns<SettingsRow[]>(),
     admin.from("profiles").select("id, name, phone, created_at").in("id", shops.map((s) => s.owner_id)).returns<ProfileRow[]>(),
@@ -315,7 +321,8 @@ export async function loadShopData(sb: SupabaseClient, shop: Shop, lines: ShopDa
   const table = <T>(name: string, columns = "*", order = "created_at") =>
     all<T>((from, to) => sb.from(name).select(columns).eq("shop_id", id).order(order).order("id").range(from, to).returns<T[]>());
 
-  const [customers, entries, payments, promises, disputes, notes, calls, events, batches, imports, changes] = await Promise.all([
+  const since = new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000).toISOString();
+  const [customers, entries, payments, promises, disputes, notes, calls, events, batches, imports, changes, usage] = await Promise.all([
     table<CustomerRow>("customers"),
     table<EntryRow>("ledger_entries"),
     table<PaymentRow>("payments"),
@@ -327,6 +334,7 @@ export async function loadShopData(sb: SupabaseClient, shop: Shop, lines: ShopDa
     table<BatchRow>("reminder_batches"),
     table<ImportRow>("khata_imports"),
     table<ChangeRow>("khata_import_changes", "import_id, kind, entry_id, customer_id, previous_amount, previous_items", "import_id"),
+    all<UsageRow>((from, to) => sb.from("usage_events").select("kind, customer_id, at").eq("shop_id", id).gte("at", since).order("at").range(from, to).returns<UsageRow[]>()),
   ]);
 
   const eventsByCall = new Map<string, CallEvent[]>();
@@ -380,5 +388,16 @@ export async function loadShopData(sb: SupabaseClient, shop: Shop, lines: ShopDa
     batches: mappedBatches,
     imports: mappedImports,
     lines,
+    usage: toUsage(usage, now),
+  };
+}
+
+type UsageRow = { kind: "photo_read" | "whatsapp_reminder"; customer_id: string | null; at: string };
+
+function toUsage(rows: UsageRow[], now: Date): Usage {
+  const today = toDateKey(now);
+  return {
+    whatsapp: rows.flatMap((r) => (r.kind === "whatsapp_reminder" && r.customer_id ? [{ customerId: r.customer_id, at: r.at }] : [])),
+    photoReadsToday: rows.filter((r) => r.kind === "photo_read" && toDateKey(new Date(r.at)) === today).length,
   };
 }

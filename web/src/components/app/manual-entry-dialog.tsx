@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import type { KhataLineInput } from "@/lib/api/contract";
 import { useT } from "@/lib/i18n";
 
@@ -42,7 +43,7 @@ export function ManualEntryDialog({ open, onOpenChange, today, onLines }: { open
                 <Input aria-label={`${t.name} ${i + 1}`} placeholder={t.name} value={r.name} onChange={(e) => set(r.key, { name: e.target.value })} className="col-span-2 sm:col-span-1" />
                 <Input aria-label={`${t.amount} ${i + 1}`} placeholder={t.amount} inputMode="numeric" value={r.amount} onChange={(e) => set(r.key, { amount: e.target.value })} />
                 <Input aria-label={`${t.items} ${i + 1}`} placeholder={t.items} value={r.items} onChange={(e) => set(r.key, { items: e.target.value })} />
-                <Input aria-label={`${t.date} ${i + 1}`} type="date" max={today} value={r.date} onChange={(e) => set(r.key, { date: e.target.value })} />
+                <DateInput aria-label={`${t.date} ${i + 1}`} max={today} value={r.date} onChange={(e) => set(r.key, { date: e.target.value })} />
                 <Input aria-label={`${t.phone} ${i + 1}`} placeholder={t.phone} inputMode="tel" value={r.phone} onChange={(e) => set(r.key, { phone: e.target.value })} />
                 <Button type="button" variant="ghost" size="icon" aria-label={t.remove} onClick={() => setRows((rs) => (rs.length > 1 ? rs.filter((x) => x.key !== r.key) : rs))}>
                   <Trash2 className="size-4" />

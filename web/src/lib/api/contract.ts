@@ -11,6 +11,7 @@ import type {
   Note,
   Payment,
   PaymentPromise,
+  PlanId,
   ReminderBatch,
   Shop,
   User,
@@ -218,6 +219,18 @@ export type DemoCallResult =
 
 export type Session = { user: User; shop: Shop };
 
+/** The shop's plan and what it has used of it. */
+export type PlanUsage = {
+  plan: PlanId;
+  /** Reminder calls placed or scheduled this month. */
+  callsUsed: number;
+  callsIncluded: number;
+  /** Calls left from call packs. */
+  extraCalls: number;
+  photoReadsToday: number;
+  photoReadsPerDay: number;
+};
+
 /** The identifier is either a 10-digit Indian mobile or an email address. */
 export type SignInInput = { identifier: string; password: string };
 /** Signed in straight away, or a code was emailed to `verifyEmail` (when Supabase confirms emails). */
@@ -315,6 +328,14 @@ export interface UdhaarApi {
   getDailyReport(): Promise<DailyReport>;
   sendReportCall(): Promise<Call>;
   getGraph(): Promise<GraphData>;
+
+  getPlan(): Promise<PlanUsage>;
+  /** Payments aren't live yet: during the pilot a shop switches plans at no charge. */
+  setPlan(plan: PlanId): Promise<PlanUsage>;
+  /** Adds a call pack's calls (lib/domain/rules.ts CALL_PACK). */
+  addCallPack(): Promise<PlanUsage>;
+  /** The shopkeeper sent a WhatsApp reminder to this customer; Asha may call a few days later. */
+  logWhatsappReminder(customerId: string): Promise<void>;
 
   /** Public demo page: a reminder call to the visitor, playing a customer of the demo shop. */
   startDemoCall(input: { phone: string; language: Language; name?: string }): Promise<DemoCallResult>;

@@ -21,6 +21,7 @@ export const useDashboard = () => useQuery({ queryKey: ["dashboard"], queryFn: (
 export const useDailyReport = () => useQuery({ queryKey: ["report"], queryFn: () => api.getDailyReport() });
 export const useKhataImports = () => useQuery({ queryKey: ["khata-imports"], queryFn: () => api.listKhataImports() });
 export const useGraph = () => useQuery({ queryKey: ["graph"], queryFn: () => api.getGraph() });
+export const usePlan = () => useQuery({ queryKey: ["plan"], queryFn: () => api.getPlan() });
 
 /**
  * Wraps an API write. Everything is refetched afterwards, because any write can change any view.

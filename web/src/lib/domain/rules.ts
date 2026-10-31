@@ -9,6 +9,7 @@ import type {
   Note,
   Payment,
   PaymentPromise,
+  PlanId,
 } from "./types";
 
 /**
@@ -264,4 +265,79 @@ export function batchStatus(calls: CallStatus[]): BatchStatus {
 /** A batch's time can change only before it starts dialing: every call still in it is waiting for its time. */
 export function canChangeBatchTime(calls: CallStatus[]): boolean {
   return calls.some((s) => s === "scheduled") && calls.every((s) => s === "scheduled" || s === "cancelled");
+}
+
+/* ---------------------------------------------------------------- plans */
+
+/**
+ * What each plan includes. The khata is free; Asha's calls are what a shop pays for, because each
+ * call costs us money and WhatsApp costs almost nothing. `photoReadsPerDay` keeps the AI models'
+ * cost in check; `summaryCalls` is how often the evening summary is a phone call.
+ */
+export const PLANS: Record<PlanId, { price: number; callsPerMonth: number; photoReadsPerDay: number; summaryCalls: "none" | "weekly" | "daily" }> = {
+  free: { price: 0, callsPerMonth: 0, photoReadsPerDay: 2, summaryCalls: "none" },
+  asha: { price: 199, callsPerMonth: 25, photoReadsPerDay: 30, summaryCalls: "weekly" },
+  asha_plus: { price: 399, callsPerMonth: 60, photoReadsPerDay: 30, summaryCalls: "daily" },
+};
+
+/** Extra calls on any plan. They don't expire, and are used once a month's calls run out. */
+export const CALL_PACK = { price: 49, calls: 10 } as const;
+
+/** Smaller dues get WhatsApp reminders only. */
+export const MIN_DUE_FOR_CALL = 300;
+/** Reminder calls to one customer in a calendar month. */
+export const CALLS_PER_CUSTOMER_PER_MONTH = 2;
+/** Days after a WhatsApp reminder before Asha may call, giving the customer time to pay or reply. */
+export const WHATSAPP_WAIT_DAYS = 3;
+/** A WhatsApp reminder older than this no longer counts towards a call. */
+export const WHATSAPP_VALID_DAYS = 30;
+/** On the Asha plan the summary call comes on Saturdays (0 is Sunday). */
+export const WEEKLY_SUMMARY_DAY = 6;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const monthKey = (d: Date) => toDateKey(d).slice(0, 7);
+
+/** True when `at` falls in the same calendar month as `now`. */
+export const inSameMonth = (at: Date, now: Date) => monthKey(at) === monthKey(now);
+
+/** Calls a shop can still place: what's left of this month's plus its call packs. */
+export function callsLeft(plan: PlanId, usedThisMonth: number, extraCalls: number): { monthly: number; extra: number; total: number } {
+  const monthly = Math.max(0, PLANS[plan].callsPerMonth - usedThisMonth);
+  const extra = Math.max(0, extraCalls);
+  return { monthly, extra, total: monthly + extra };
+}
+
+/** How many of `count` new calls come out of call packs, after this month's calls are used. */
+export function packCallsUsed(plan: PlanId, usedThisMonth: number, count: number): number {
+  return Math.max(0, count - Math.max(0, PLANS[plan].callsPerMonth - usedThisMonth));
+}
+
+/** Whether today's evening summary is a phone call on this plan. */
+export function summaryCallToday(plan: PlanId, now: Date): boolean {
+  const every = PLANS[plan].summaryCalls;
+  return every === "daily" || (every === "weekly" && now.getDay() === WEEKLY_SUMMARY_DAY);
+}
+
+/**
+ * Whether Asha may call yet, going by WhatsApp: a reminder sent at least WHATSAPP_WAIT_DAYS ago,
+ * within the last WHATSAPP_VALID_DAYS, with no payment since it. A missed promise or a request to
+ * be called back skips this: the customer has already been in touch.
+ */
+export function whatsappStep(
+  sent: Date[],
+  lastPaymentAt: Date | undefined,
+  now: Date,
+): { ready: true } | { ready: false; sentAt?: Date; callableFrom?: Date } {
+  const valid = sent.filter((d) => now.getTime() - d.getTime() <= WHATSAPP_VALID_DAYS * DAY_MS && (!lastPaymentAt || d > lastPaymentAt));
+  if (valid.length === 0) return { ready: false };
+  const first = valid.reduce((a, b) => (a < b ? a : b));
+  const callableFrom = new Date(first.getTime() + WHATSAPP_WAIT_DAYS * DAY_MS);
+  return now >= callableFrom ? { ready: true } : { ready: false, sentAt: first, callableFrom };
+}
+
+/** When calls are fewer than the customers chosen, who gets them: oldest dues first, then the largest. */
+export function byCallPriority<T extends { oldestDue?: string; balance: number }>(a: T, b: T): number {
+  const ao = a.oldestDue ?? "9999";
+  const bo = b.oldestDue ?? "9999";
+  return ao !== bo ? ao.localeCompare(bo) : b.balance - a.balance;
 }

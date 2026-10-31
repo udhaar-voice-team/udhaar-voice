@@ -41,6 +41,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -237,6 +238,8 @@ function CustomerActions({ d }: { d: CustomerDetail }) {
   };
   const callNow = () => callAt("now");
 
+  // Asha may call a few days after a WhatsApp reminder, so sending one is noted.
+  const logWhatsapp = useApiMutation(api.logWhatsappReminder, { quiet: true });
   const shopName = shop.data?.name ?? "";
   const upi = shop.data ? upiLink({ upiId: shop.data.upiId, payeeName: shopName, amount: d.balance }) : "";
   const whatsapp = d.customer.phone ? whatsappShareLink(d.customer.phone, c.upiMessage(shopName, formatINR(d.balance), upi)) : undefined;
@@ -278,7 +281,7 @@ function CustomerActions({ d }: { d: CustomerDetail }) {
       </div>
       {whatsapp && d.balance > 0 ? (
         <Button asChild size="lg" variant="outline">
-          <a href={whatsapp} target="_blank" rel="noopener noreferrer">
+          <a href={whatsapp} target="_blank" rel="noopener noreferrer" onClick={() => logWhatsapp.mutate(d.customer.id)}>
             <MessageCircle /> {c.actions.shareUpi}
           </a>
         </Button>
@@ -477,7 +480,7 @@ function LedgerEditDialog({ line, onClose }: { line: LedgerLine; onClose: () => 
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-date">{e.date}</Label>
-              <Input id="edit-date" type="date" value={date} max={toDateKey(new Date())} onChange={(x) => setDate(x.target.value)} />
+              <DateInput id="edit-date" value={date} max={toDateKey(new Date())} onChange={(x) => setDate(x.target.value)} />
             </div>
           </div>
           {line.kind === "entry" ? (

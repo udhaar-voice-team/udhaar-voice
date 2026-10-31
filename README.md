@@ -74,6 +74,11 @@ bolna/
 - **Dispatcher** (`lib/server/dispatcher.ts`): every minute (Supabase cron, `0005_scheduler.sql`) and right after a call is scheduled for now. It creates evening summary calls at each shop's time, queues due calls, and dials them while lines are free, taking turns between shops and only inside calling hours. A call is claimed before it's dialled, so it's never dialled twice.
 - **Results:** Bolna's webhook (`/api/bolna/webhook`) and the dispatcher's check of calls on a line both read the call back from Bolna's API, then write the status, transcript, cost and the extracted outcome, promise, dispute, notes and opt-out (`lib/server/call-results.ts`). A finished call's result is written once.
 
+## Plans
+
+- **Plans** (`PLANS` in `lib/domain/rules.ts`, `0008_plans.sql`, the Plans page): the khata is free, with 2 photo reads a day. Asha (₹199 a month) adds 25 reminder calls a month and a Saturday summary call; Asha Plus (₹399) adds 60 calls and a daily summary call; both read up to 30 photos a day. Call packs add 10 calls on any plan, used once the month's calls run out. Payments aren't live: during the pilot, plans switch at no charge. New shops start on the free plan.
+- **WhatsApp first:** sending a WhatsApp reminder from a customer's page is noted, and Asha may call 3 days later if no payment came in. A missed promise or a request to be called back skips this step. Dues under ₹300 get WhatsApp only, nobody is called more than twice a month, nobody is reminded before a promised date, and when calls run short the oldest and largest dues are called first.
+
 ## Corrections and accounts
 
 - **Customers** can be added by hand on the Customers page, as well as from khata photos. They can be renamed, or removed: a removed customer leaves the lists and their waiting calls are cancelled, but past calls stay (needs `0007`).

@@ -14,6 +14,10 @@ const fresh = (): ShopData => ({ ...createSeed(NOW), imports: [], lines: { lines
 const status = (db: ShopData, id: string, now = NOW) => summaries(db, now).find((s) => s.customer.id === id)?.status;
 const eligibility = (db: ShopData, id: string) => candidates(db, NOW).find((c) => c.customer.id === id);
 
+/** Gives a customer another ₹`amount` of dues, so the minimum for a call doesn't decide the test. */
+const owes = (db: ShopData, id: string, amount = 500) =>
+  db.entries.push({ id: `extra-${id}`, customerId: id, amount, items: "", date: "2026-10-01", source: "manual", createdAt: "2026-10-01T10:00:00Z" });
+
 let nextId = 0;
 
 /** Does in memory what lib/server/api.ts writes to the database for a schedule plan. */
@@ -80,6 +84,7 @@ describe("who can be called", () => {
 
   it("never re-dials a wrong number until it is changed", () => {
     const db = fresh();
+    owes(db, "c11");
     const later = new Date("2026-10-23T11:00:00"); // past the 3-day reminder gap
     const at = (when: Date) => candidates(db, when).find((c) => c.customer.id === "c11");
     expect(at(later)?.reason).toMatch(/Update the number/);
@@ -108,10 +113,12 @@ describe("who can be called", () => {
 
   it("calls each customer in their own language unless the batch picks one, and reports who was skipped", () => {
     const db = fresh();
+    owes(db, "c03");
     const auto = planSchedule(db, { customerIds: ["c01", "c03", "c02", "c10"], at: "now", language: "auto", bypassHours: false }, NOW);
+    // Oldest dues first: Bapi's extra dues are from 1 October.
     expect(auto.kind === "batch" && auto.calls.map((c) => [c.customerId, c.language])).toEqual([
-      ["c01", "hi"],
       ["c03", "bn"],
+      ["c01", "hi"],
     ]);
     // Sunita was reminded three days ago this evening; Anjali asked not to be called.
     expect(auto.kind === "batch" && auto.skipped.map((s) => s.customer.id)).toEqual(["c02", "c10"]);
@@ -122,6 +129,59 @@ describe("who can be called", () => {
   it("schedules nothing when nobody in the list can be called", () => {
     const plan = planSchedule(fresh(), { customerIds: ["c10", "c14"], at: "now", language: "auto", bypassHours: false }, NOW);
     expect(plan.kind).toBe("nothing");
+  });
+});
+
+describe("plans and the reminder steps", () => {
+  it("calls only from a plan or a call pack", () => {
+    const db = fresh();
+    db.shop.plan = "free";
+    expect(eligibility(db, "c13")?.reason).toMatch(/Asha plan/);
+    db.shop.extraCalls = 10;
+    expect(eligibility(db, "c13")?.eligible).toBe(true);
+  });
+
+  it("keeps small dues to WhatsApp", () => {
+    expect(eligibility(fresh(), "c06")?.reason).toMatch(/WhatsApp reminders only/);
+  });
+
+  it("calls after a WhatsApp reminder has had three days, and starts over after a payment", () => {
+    const db = fresh();
+    db.usage.whatsapp = [];
+    expect(eligibility(db, "c12")?.reason).toMatch(/WhatsApp reminder first/);
+    db.usage.whatsapp = [{ customerId: "c12", at: "2026-10-20T10:00:00" }];
+    expect(eligibility(db, "c12")?.reason).toMatch(/Asha can call from Fri 23 Oct/);
+    db.usage.whatsapp = [{ customerId: "c12", at: "2026-10-17T10:00:00" }];
+    expect(eligibility(db, "c12")?.eligible).toBe(true);
+    db.payments.push({ id: "p-new", customerId: "c12", amount: 100, method: "cash", date: "2026-10-20", createdAt: "2026-10-20T12:00:00" });
+    expect(eligibility(db, "c12")?.reason).toMatch(/WhatsApp reminder first/);
+  });
+
+  it("waits for a promise's date, and calls once it is missed", () => {
+    const db = fresh();
+    db.promises.push({ id: "pr1", customerId: "c12", amount: 500, dueDate: "2026-10-25", status: "open", createdAt: "2026-10-20T10:00:00Z" });
+    expect(eligibility(db, "c12")?.reason).toMatch(/Promised ₹500 by/);
+    db.promises[db.promises.length - 1].dueDate = "2026-10-19";
+    db.usage.whatsapp = [];
+    expect(eligibility(db, "c12")?.eligible).toBe(true);
+  });
+
+  it("calls a customer at most twice a month", () => {
+    const db = fresh();
+    for (const day of ["05", "12"]) {
+      db.calls.push({ id: `k${day}`, shopId: db.shop.id, kind: "reminder", customerId: "c12", language: "bn", status: "completed", scheduledAt: `2026-10-${day}T10:00:00`, transcript: [], events: [] });
+    }
+    expect(eligibility(db, "c12")?.reason).toMatch(/2 times this month/);
+  });
+
+  it("calls the oldest and largest dues first when calls run short, then uses call packs", () => {
+    const db = fresh();
+    db.shop.plan = "free";
+    db.shop.extraCalls = 1;
+    const plan = planSchedule(db, { customerIds: ["c01", "c13", "c12"], at: "now", language: "auto", bypassHours: false }, NOW);
+    expect(plan.kind === "batch" && plan.calls).toHaveLength(1);
+    expect(plan.kind === "batch" && plan.packCalls).toBe(1);
+    expect(plan.kind === "batch" && plan.skipped.map((s) => s.reason)).toEqual([expect.stringMatching(/No calls left/), expect.stringMatching(/No calls left/)]);
   });
 });
 
@@ -180,6 +240,7 @@ describe("editing a batch", () => {
 describe("waiting for a line", () => {
   it("tells waiting calls their place in line, sharing lines with other shops", () => {
     const db = fresh();
+    owes(db, "c03");
     const batch = schedule(db, { customerIds: ["c01", "c03", "c13"], at: "now", language: "auto", bypassHours: false }).batch!;
     for (const id of batch.callIds) setStatus(db, id, "queued");
     const mine = batch.callIds.map((id, i) => ({ id, shopId: db.shop.id, scheduledAt: `2026-10-21T05:30:0${i}Z`, status: "queued" as const }));

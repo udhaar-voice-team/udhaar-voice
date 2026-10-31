@@ -29,6 +29,10 @@ export const User = z.object({
 });
 export type User = z.infer<typeof User>;
 
+/** What a shop pays for: the free khata, or Asha's calls (lib/domain/rules.ts PLANS). */
+export const PlanId = z.enum(["free", "asha", "asha_plus"]);
+export type PlanId = z.infer<typeof PlanId>;
+
 export const Shop = z.object({
   id: z.string(),
   /** The user account that owns this shop. */
@@ -49,6 +53,9 @@ export const Shop = z.object({
   reportLanguage: Language,
   /** Mirrors Bolna's bypass_call_guardrails flag. Only for demos outside calling hours. */
   demoBypassHours: z.boolean(),
+  plan: PlanId,
+  /** Calls left from call packs. */
+  extraCalls: z.number().int().nonnegative(),
 });
 export type Shop = z.infer<typeof Shop>;
 

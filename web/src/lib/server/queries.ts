@@ -9,8 +9,13 @@ import {
   dialOrder,
   estimatedWaitSeconds,
   formatINR,
+  CALLS_PER_CUSTOMER_PER_MONTH,
+  inSameMonth,
   isPromiseBroken,
+  MIN_DUE_FOR_CALL,
   nextReminderDate,
+  PLANS,
+  whatsappStep,
   normalizeIndianMobile,
   toDateKey,
 } from "@/lib/domain/rules";
@@ -28,6 +33,7 @@ import type {
   GraphData,
   GraphEdge,
   GraphNode,
+  PlanUsage,
   QueueSpot,
 } from "@/lib/api/contract";
 import { buildReportScript } from "@/lib/demo/scripts";
@@ -108,8 +114,19 @@ export function candidates(db: ShopData, now: Date): EligibleCustomer[] {
     const refusedUntil =
       lastOutcome === "refused" && lastAnswered?.endedAt ? addDays(new Date(lastAnswered.endedAt), REFUSAL_COOLDOWN_DAYS) : undefined;
 
+    const broken = !!s.nextPromise && isPromiseBroken(s.nextPromise, now);
+    const callsThisMonth = customerCalls(db, c.id).filter(
+      (k) => k.kind === "reminder" && !["cancelled", "failed"].includes(k.status) && inSameMonth(new Date(k.scheduledAt), now),
+    ).length;
+    const whatsapp = whatsappStep(
+      db.usage.whatsapp.filter((w) => w.customerId === c.id).map((w) => new Date(w.at)),
+      lastPaymentAt(db, c.id),
+      now,
+    );
+
     let reason: string | undefined;
     if (s.balance <= 0) reason = "Nothing due";
+    else if (PLANS[db.shop.plan].callsPerMonth === 0 && db.shop.extraCalls === 0) reason = "Asha's calls come with the Asha plan. See Plans.";
     else if (c.optedOut) reason = "Asked not to be called";
     else if (!c.phone) reason = "No phone number";
     else if (active) reason = "Already scheduled";
@@ -119,6 +136,13 @@ export function candidates(db: ShopData, now: Date): EligibleCustomer[] {
     else if (lastOutcome !== "callback" && s.lastReminderAt && !canRemind(new Date(s.lastReminderAt), db.shop.reminderGapDays, now)) {
       const next = nextReminderDate(new Date(s.lastReminderAt), db.shop.reminderGapDays);
       reason = `Reminded ${fmtDay(s.lastReminderAt)}; next allowed ${fmtDay(next.toISOString())}`;
+    } else if (lastOutcome !== "callback" && s.balance < MIN_DUE_FOR_CALL) reason = `Under ${formatINR(MIN_DUE_FOR_CALL)}: WhatsApp reminders only`;
+    else if (s.nextPromise && !broken) reason = `Promised ${formatINR(s.nextPromise.amount)} by ${fmtDay(s.nextPromise.dueDate)}. No reminder before then.`;
+    else if (callsThisMonth >= CALLS_PER_CUSTOMER_PER_MONTH) reason = `Called ${callsThisMonth} times this month already`;
+    else if (lastOutcome !== "callback" && !broken && !whatsapp.ready) {
+      reason = whatsapp.callableFrom
+        ? `WhatsApp sent ${fmtDay(whatsapp.sentAt!.toISOString())}. Asha can call from ${fmtDay(whatsapp.callableFrom.toISOString())}.`
+        : "Send a WhatsApp reminder first. Asha calls if nothing comes in after 3 days.";
     }
     const callbackAt = lastOutcome === "callback" ? lastAnswered?.extraction?.callbackAt : undefined;
     const note = s.openDispute
@@ -128,6 +152,37 @@ export function candidates(db: ShopData, now: Date): EligibleCustomer[] {
         : undefined;
     return { ...s, eligible: !reason, reason, note };
   });
+}
+
+function lastPaymentAt(db: ShopData, customerId: string): Date | undefined {
+  const last = db.payments.filter((p) => p.customerId === customerId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  return last ? new Date(last.createdAt) : undefined;
+}
+
+/** The date of the oldest entry payments haven't covered yet, paying off the oldest first. */
+export function oldestDue(db: ShopData, customerId: string): string | undefined {
+  let paid = db.payments.filter((p) => p.customerId === customerId).reduce((sum, p) => sum + p.amount, 0);
+  for (const e of db.entries.filter((x) => x.customerId === customerId).sort((a, b) => a.date.localeCompare(b.date))) {
+    if (paid < e.amount) return e.date;
+    paid -= e.amount;
+  }
+  return undefined;
+}
+
+/** Reminder calls this shop has placed or scheduled this month, which count against its plan. */
+export const callsUsedThisMonth = (db: ShopData, now: Date) =>
+  db.calls.filter((k) => k.kind === "reminder" && !["cancelled", "failed"].includes(k.status) && inSameMonth(new Date(k.scheduledAt), now)).length;
+
+export function planUsage(db: ShopData, now: Date): PlanUsage {
+  const plan = PLANS[db.shop.plan];
+  return {
+    plan: db.shop.plan,
+    callsUsed: callsUsedThisMonth(db, now),
+    callsIncluded: plan.callsPerMonth,
+    extraCalls: db.shop.extraCalls,
+    photoReadsToday: db.usage.photoReadsToday,
+    photoReadsPerDay: plan.photoReadsPerDay,
+  };
 }
 
 /** A typical reminder call, for wait estimates. */
